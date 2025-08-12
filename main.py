@@ -112,7 +112,8 @@ app.add_middleware(
 FACEBOOK_SCOPES = [
     "pages_manage_engagement",
     "pages_read_engagement",
-    "pages_read_user_engagement",
+    "pages_manage_posts",
+    "pages_show_list"
 ]
 
 class FacebookTokenStore:
