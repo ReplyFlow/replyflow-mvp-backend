@@ -984,13 +984,13 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
             # token_store.save_token(f"page:{page_id}", page_access_token, long_lived_user_token)
 
           # After you have a long-lived user token and a Page with ig account:
-          # page: { id, access_token, instagram_business_account: { id: <IG_USER_ID> } }
-          token_store.save_token(
-              user_id=current_user_id,
-              provider="instagram",
-              ig_account_id=ig_user_id,
-              page_access_token=page_token,
-          )
+            # page: { id, access_token, instagram_business_account: { id: <IG_USER_ID> } }
+            token_store.save_token(
+                user_id=current_user_id,
+                provider="instagram",
+                ig_account_id=ig_user_id,
+                page_access_token=page_token,
+            )
 
 
             # 6) Success redirect (include which IG account you connected if available)
@@ -1019,7 +1019,7 @@ async def _prepare_instagram_replies(
     """
     # You should already save these in your OAuth callback:
     # token_store.save_token(user_id, provider="instagram",
-    #                        ig_account_id=<IG user id>, page_access_token=<page token>)
+    # ig_account_id=<IG user id>, page_access_token=<page token>)
     ig_token = token_store.get_token_for_user(current_user.get("id"), provider="instagram")
     if not ig_token:
         return []
