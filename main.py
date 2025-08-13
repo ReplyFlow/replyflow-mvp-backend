@@ -40,14 +40,18 @@ import json
 import urllib.parse
 import uuid
 import datetime
+import time
+import base64
 import hmac
 import hashlib
 import secrets
+import logging
+import httpx
 from typing import Optional, Dict, Any
-
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
+from urllib.parse import urlencode, quote_plus
 
 try:
     import openai  # type: ignore
@@ -504,75 +508,78 @@ async def facebook_login() -> RedirectResponse:
 
 
 @app.get("/facebook/callback")
-async def facebook_callback(code: str, state: Optional[str] = None) -> HTMLResponse:
-    """Handle the OAuth callback from Facebook, exchange the code, and show a success page.
+async def facebook_callback(code: str, state: Optional[str] = None):
+    """Handle the OAuth callback from Facebook, exchange the code, and redirect to dashboard."""
+    
+    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
+    DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
 
-    Facebook redirects the user to this endpoint with a short-lived
-    authorization code and a state value. This handler exchanges the code
-    for a user access token, then requests the list of Pages the user
-    manages to obtain a Page access token. Instead of returning JSON,
-    this endpoint renders a simple HTML page indicating success. In a
-    production implementation you should store the tokens securely on
-    the server and associate them with the authenticated user.
-    """
+    def _redir(reason: Optional[str] = None):
+        """Internal helper for building redirect URLs."""
+        if reason:
+            return RedirectResponse(
+                url=f"{DASHBOARD_URL}?connected=facebook&error=1&reason={quote_plus(reason)}",
+                status_code=302,
+            )
+        return RedirectResponse(
+            url=f"{DASHBOARD_URL}?connected=facebook",
+            status_code=302,
+        )
+
     app_id = os.getenv("FACEBOOK_APP_ID")
     app_secret = os.getenv("FACEBOOK_APP_SECRET")
     redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
+
     if not (app_id and app_secret and redirect_uri):
-        raise HTTPException(
-            status_code=500,
-            detail="FACEBOOK_APP_ID, FACEBOOK_APP_SECRET and FACEBOOK_REDIRECT_URI must be set",
-        )
+        logging.error("Missing Facebook config environment variables")
+        return _redir("missing_config")
+
     if not _httpx_available:
-        raise HTTPException(status_code=500, detail="httpx is not available")
+        logging.error("httpx is not available")
+        return _redir("httpx_unavailable")
 
-    # Exchange code for a short-lived user access token
-    token_params = {
-        "client_id": app_id,
-        "client_secret": app_secret,
-        "redirect_uri": redirect_uri,
-        "code": code,
-    }
-    async with httpx.AsyncClient() as client:
-        token_resp = await client.get(
-            "https://graph.facebook.com/v18.0/oauth/access_token",
-            params=token_params,
-            timeout=10,
-        )
-        token_data = token_resp.json()
-        access_token = token_data.get("access_token")
-        if not access_token:
-            raise HTTPException(status_code=400, detail=f"Failed to obtain access token: {token_data}")
+    try:
+        # Exchange code for a short-lived user access token
+        token_params = {
+            "client_id": app_id,
+            "client_secret": app_secret,
+            "redirect_uri": redirect_uri,
+            "code": code,
+        }
+        async with httpx.AsyncClient() as client:
+            token_resp = await client.get(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params=token_params,
+                timeout=10,
+            )
+            token_data = token_resp.json()
+            access_token = token_data.get("access_token")
+            if not access_token:
+                logging.error(f"Failed to obtain access token: {token_data}")
+                return _redir("no_access_token")
 
-        # Request the Pages managed by the user to obtain a page token. The
-        # user must have the required permissions (pages_manage_engagement). The
-        # first page in the list is returned for demonstration; you may need
-        # to let the user pick the relevant page.
-        pages_resp = await client.get(
-            "https://graph.facebook.com/v18.0/me/accounts",
-            params={"access_token": access_token},
-            timeout=10,
-        )
-        pages_data = pages_resp.json()
+            # Request the Pages managed by the user
+            pages_resp = await client.get(
+                "https://graph.facebook.com/v18.0/me/accounts",
+                params={"access_token": access_token},
+                timeout=10,
+            )
+            pages_data = pages_resp.json()
 
-    # Store tokens for each page the user manages. In this demonstration, we
-    # iterate over all returned pages and persist the page and user tokens.
-    if pages_data and "data" in pages_data:
-        for page in pages_data.get("data", []):
-            page_id = page.get("id")
-            page_token = page.get("access_token")
-            if page_id and page_token:
-                token_store.save_token(page_id, page_token, access_token)
-    html_content = """
-    <html>
-    <head><title>Facebook Connected</title></head>
-    <body>
-        <h2>Facebook Connected</h2>
-        <p>Your Facebook Page has been successfully connected. You can now close this window.</p>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content, status_code=200)
+        # Store tokens for each page the user manages
+        if pages_data and "data" in pages_data:
+            for page in pages_data.get("data", []):
+                page_id = page.get("id")
+                page_token = page.get("access_token")
+                if page_id and page_token:
+                    token_store.save_token(page_id, page_token, access_token)
+
+        # Success
+        return _redir(None)
+
+    except Exception as e:
+        logging.exception("Unexpected error in Facebook callback")
+        return _redir("unexpected_error")
 
 
 async def generate_with_openai(comment: str, tone: str) -> str:
@@ -833,50 +840,169 @@ async def stripe_webhook(request: Request) -> dict:
 # ---------------------------------------------------------------------------
 # Instagram, X, and Reddit placeholder endpoints
 
-# Instagram endpoints
+# --- config (keep your existing FRONTEND_BASE_URL / DASHBOARD_URL) ---
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
+
+INSTAGRAM_APP_ID = os.getenv("INSTAGRAM_APP_ID")        # same Meta app id
+INSTAGRAM_APP_SECRET = os.getenv("INSTAGRAM_APP_SECRET")
+INSTAGRAM_REDIRECT_URI = os.getenv("INSTAGRAM_REDIRECT_URI")
+
+IG_SCOPES = [
+    "instagram_basic",
+    "instagram_manage_comments",
+    "pages_show_list",
+    "pages_read_engagement",
+    "pages_manage_engagement",
+]
+
+logger = logging.getLogger("replyflow.instagram")
+
+def _redir_instagram(reason: Optional[str] = None) -> RedirectResponse:
+    if reason:
+        return RedirectResponse(
+            url=f"{DASHBOARD_URL}?connected=instagram&error=1&reason={quote_plus(reason)}",
+            status_code=302,
+        )
+    return RedirectResponse(
+        url=f"{DASHBOARD_URL}?connected=instagram",
+        status_code=302,
+    )
+
+# --- lightweight state generator/validator (no server session needed) ---
+def _make_state(secret: str, ttl_sec: int = 600) -> str:
+    ts = str(int(time.time()))
+    sig = hmac.new(secret.encode(), ts.encode(), hashlib.sha256).digest()
+    return f"{ts}.{base64.urlsafe_b64encode(sig).decode().rstrip('=')}"
+
+def _check_state(state: str, secret: str, ttl_sec: int = 600) -> bool:
+    try:
+        ts_str, sig_b64 = state.split(".", 1)
+        ts = int(ts_str)
+        if abs(time.time() - ts) > ttl_sec:
+            return False
+        expected = hmac.new(secret.encode(), ts_str.encode(), hashlib.sha256).digest()
+        ok = hmac.compare_digest(
+            base64.urlsafe_b64encode(expected).decode().rstrip("="),
+            sig_b64
+        )
+        return ok
+    except Exception:
+        return False
+
+# --- /instagram/login: build Meta OAuth URL with Instagram scopes ---
 @app.get("/instagram/login")
-async def instagram_login() -> dict:
-    """Placeholder login endpoint for Instagram OAuth.
+async def instagram_login():
+    if not (INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET and INSTAGRAM_REDIRECT_URI):
+        logger.error("Missing Instagram config envs (APP_ID/SECRET/REDIRECT_URI)")
+        return _redir_instagram("missing_config")
 
-    In a full implementation this would redirect the user to Instagram's OAuth
-    authorization page and handle the callback. For now it simply returns
-    a message indicating that the feature is not yet implemented.
-    """
-    return {"message": "Instagram login is not implemented yet. Stay tuned!"}
+    state = _make_state(INSTAGRAM_APP_SECRET)
+    params = {
+        "client_id": INSTAGRAM_APP_ID,          # your Meta App ID
+        "redirect_uri": INSTAGRAM_REDIRECT_URI, # this endpoint's callback
+        "state": state,
+        "response_type": "code",
+        "scope": " ".join(IG_SCOPES),
+    }
+    auth_url = f"https://www.facebook.com/v18.0/dialog/oauth?{urlencode(params)}"
+    # 302 to the Meta Login dialog
+    return RedirectResponse(url=auth_url, status_code=302)
 
+# --- /instagram/callback: exchange code, find IG Business Account, redirect ---
+@app.get("/instagram/callback")
+async def instagram_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None):
+    if not (INSTAGRAM_APP_ID and INSTAGRAM_APP_SECRET and INSTAGRAM_REDIRECT_URI):
+        logger.error("Missing Instagram config envs during callback")
+        return _redir_instagram("missing_config")
 
-@app.post("/instagram/prepare_replies")
-async def instagram_prepare_replies(
-    tone: str = "friendly",
-    max_posts: int = 3,
-    max_comments: int = 5,
-    current_user: dict = Depends(get_current_user),
-) -> list[dict]:
-    """Prepare draft replies for Instagram comments (placeholder).
+    if not code:
+        logger.warning("Missing OAuth code in Instagram callback")
+        return _redir_instagram("missing_code")
 
-    This stub endpoint returns an empty list to indicate that no comments
-    were found. When Instagram integration is implemented, it should fetch
-    recent comments on the user's connected Instagram accounts and call
-    /generate_reply for each comment.
-    """
-    # Since we don't yet have an Instagram API integration, return an empty list.
-    return []
+    if not state or not _check_state(state, INSTAGRAM_APP_SECRET):
+        logger.warning("Invalid state in Instagram callback")
+        return _redir_instagram("invalid_state")
 
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            # 1) Exchange code -> short-lived user access token
+            token_params = {
+                "client_id": INSTAGRAM_APP_ID,
+                "client_secret": INSTAGRAM_APP_SECRET,
+                "redirect_uri": INSTAGRAM_REDIRECT_URI,
+                "code": code,
+            }
+            token_resp = await client.get(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params=token_params,
+            )
+            token_data = token_resp.json()
+            user_access_token = token_data.get("access_token")
+            if not user_access_token:
+                logger.error(f"IG token exchange failed: {token_data}")
+                return _redir_instagram("no_access_token")
 
-@app.post("/instagram/post_replies")
-async def instagram_post_replies(
-    tone: str = "friendly",
-    max_posts: int = 3,
-    max_comments: int = 5,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    """Post prepared replies to Instagram (placeholder).
+            # 2) (Optional but recommended) Exchange to a long-lived token
+            #    Note: for FB user tokens: /oauth/access_token with fb_exchange_token
+            ll_params = {
+                "grant_type": "fb_exchange_token",
+                "client_id": INSTAGRAM_APP_ID,
+                "client_secret": INSTAGRAM_APP_SECRET,
+                "fb_exchange_token": user_access_token,
+            }
+            ll_resp = await client.get(
+                "https://graph.facebook.com/v18.0/oauth/access_token",
+                params=ll_params,
+            )
+            ll_data = ll_resp.json()
+            long_lived_user_token = ll_data.get("access_token", user_access_token)
 
-    This stub endpoint does nothing and returns a summary message.
-    In the future it should iterate over prepared replies and post them
-    to the corresponding Instagram comments via the Instagram Graph API.
-    """
-    return {"status": "Instagram posting not implemented yet"}
+            # 3) Get Pages the user manages (need a Page that connects to IG)
+            pages_resp = await client.get(
+                "https://graph.facebook.com/v18.0/me/accounts",
+                params={"access_token": long_lived_user_token, "limit": 50},
+            )
+            pages_data = pages_resp.json()
+            pages = pages_data.get("data", []) if isinstance(pages_data, dict) else []
+
+            # 4) For each Page, check if it has an Instagram Business Account
+            ig_account_id = None
+            page_access_token = None
+            page_id = None
+
+            for p in pages:
+                pid = p.get("id")
+                ptoken = p.get("access_token")
+                if not (pid and ptoken):
+                    continue
+                page_fields_resp = await client.get(
+                    f"https://graph.facebook.com/v18.0/{pid}",
+                    params={"fields": "instagram_business_account", "access_token": ptoken},
+                )
+                page_fields = page_fields_resp.json()
+                iba = page_fields.get("instagram_business_account", {}) if isinstance(page_fields, dict) else {}
+                if "id" in iba:
+                    ig_account_id = iba["id"]
+                    page_access_token = ptoken
+                    page_id = pid
+                    break
+
+            # 5) Persist what you need so your app can act (example)
+            # token_store.save_token(f"ig:{ig_account_id}", page_access_token, long_lived_user_token)
+            # token_store.save_token(f"page:{page_id}", page_access_token, long_lived_user_token)
+
+            # 6) Success redirect (include which IG account you connected if available)
+            success_qs = "connected=instagram"
+            if ig_account_id:
+                success_qs += f"&ig_id={quote_plus(ig_account_id)}"
+            if page_id:
+                success_qs += f"&page_id={quote_plus(page_id)}"
+            return RedirectResponse(url=f"{DASHBOARD_URL}?{success_qs}", status_code=302)
+
+    except Exception as e:
+        logger.exception("Unexpected error during Instagram callback: %s", e)
+        return _redir_instagram("unexpected_error")
 
 # X (formerly Twitter) endpoints
 @app.get("/x/login")
