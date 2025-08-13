@@ -435,36 +435,69 @@ async def facebook_post_replies(
     Returns:
         A dict summarizing the number of replies posted per page.
     """
-    # Prepare replies but do not post yet
-    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
-    results: dict[str, int] = {}
+    # Ensure httpx is available
     if not _httpx_available:
         raise HTTPException(status_code=500, detail="httpx is required for Facebook API interactions")
+
+    results: dict[str, int] = {}
     async with httpx.AsyncClient() as client:
-        for item in prepared:
-            page_id = item["page_id"]
-            page_token = None
-            # Find the page token from token_store
-            for t in token_store.list_tokens():
-                if t.get("page_id") == page_id:
-                    page_token = t.get("page_access_token")
-                    break
-            if not page_token:
+        found_comments = False
+        for token in token_store.list_tokens():
+            page_id = token.get("page_id")
+            page_token = token.get("page_access_token")
+            if not (page_id and page_token):
                 continue
-            comment_id = item["comment_id"]
-            reply_message = item["reply"]
-            try:
-                await client.post(
-                    f"https://graph.facebook.com/v18.0/{comment_id}/comments",
-                    params={"access_token": page_token},
-                    json={"message": reply_message},
-                    timeout=10,
-                )
-                results[page_id] = results.get(page_id, 0) + 1
-            except Exception:
-                # Skip posting this reply if there's an error
-                continue
-    return {"replies_posted": results}
+
+            # Fetch recent posts from the Page
+            posts_resp = await client.get(
+                f"https://graph.facebook.com/v18.0/{page_id}/posts",
+                params={
+                    "access_token": page_token,
+                    "fields": "id,message,permalink_url,comments.limit(50){id,message,from,created_time}",
+                    "limit": max_posts,
+                },
+                timeout=10,
+            )
+            posts = posts_resp.json().get("data", [])
+            for post in posts:
+                comments = (post.get("comments") or {}).get("data", [])[:max_comments]
+                for comment in comments:
+                    found_comments = True
+                    prompt = f"Reply on behalf of the Page. Tone: {tone}. Comment: {comment['message']}"
+                    reply_message = await generate_reply(prompt)
+                    comment_id = comment.get("id")
+                    if not comment_id:
+                        continue
+                    try:
+                        await client.post(
+                            f"https://graph.facebook.com/v18.0/{comment_id}/comments",
+                            params={"access_token": page_token},
+                            json={"message": reply_message},
+                            timeout=10,
+                        )
+                        results[page_id] = results.get(page_id, 0) + 1
+                    except Exception:
+                        continue
+
+    if not results and not found_comments:
+        return {
+            "status": "no_comments",
+            "message": "No comments found to reply to.",
+            "replies_posted": results
+        }
+
+    if not results:
+        return {
+            "status": "no_page_token",
+            "message": "Please connect a Facebook Page first.",
+            "replies_posted": results
+        }
+
+    return {
+        "status": "ok",
+        "message": "Replies posted successfully.",
+        "replies_posted": results
+    }
 
 
 @app.get("/admin/facebook_tokens")
