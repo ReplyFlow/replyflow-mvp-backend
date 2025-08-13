@@ -983,6 +983,16 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
             # token_store.save_token(f"ig:{ig_account_id}", page_access_token, long_lived_user_token)
             # token_store.save_token(f"page:{page_id}", page_access_token, long_lived_user_token)
 
+          # After you have a long-lived user token and a Page with ig account:
+          # page: { id, access_token, instagram_business_account: { id: <IG_USER_ID> } }
+          token_store.save_token(
+              user_id=current_user_id,
+              provider="instagram",
+              ig_account_id=ig_user_id,
+              page_access_token=page_token,
+          )
+
+
             # 6) Success redirect (include which IG account you connected if available)
             success_qs = "connected=instagram"
             if ig_account_id:
@@ -995,6 +1005,82 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
         logger.exception("Unexpected error during Instagram callback: %s", e)
         return _redir_instagram("unexpected_error")
 
+# ---- Instagram helpers ------------------------------------------------------
+async def _prepare_instagram_replies(
+    tone: str,
+    max_posts: int,
+    max_comments: int,
+    current_user: dict,
+) -> list[dict]:
+    """
+    Fetch recent Instagram media for the connected Business/Creator account
+    and build draft replies for recent comments.
+    Returns a list of dicts: [{media_id, comment_id, original_comment, reply, ig_user_id}]
+    """
+    # You should already save these in your OAuth callback:
+    # token_store.save_token(user_id, provider="instagram",
+    #                        ig_account_id=<IG user id>, page_access_token=<page token>)
+    ig_token = token_store.get_token_for_user(current_user.get("id"), provider="instagram")
+    if not ig_token:
+        return []
+
+    ig_user_id = ig_token.get("ig_account_id")
+    page_access_token = ig_token.get("page_access_token")
+    if not (ig_user_id and page_access_token):
+        return []
+
+    prepared: list[dict] = []
+    if not _httpx_available:
+        return prepared
+
+    async with httpx.AsyncClient(timeout=15) as client:
+        # 1) Recent media
+        media_resp = await client.get(
+            f"https://graph.facebook.com/v18.0/{ig_user_id}/media",
+            params={
+                "fields": "id,caption",
+                "limit": max_posts,
+                "access_token": page_access_token,
+            },
+        )
+        media_items = (media_resp.json() or {}).get("data", [])
+
+        # 2) For each media, fetch comments and draft replies
+        for m in media_items:
+            media_id = m.get("id")
+            if not media_id:
+                continue
+
+            comments_resp = await client.get(
+                f"https://graph.facebook.com/v18.0/{media_id}/comments",
+                params={
+                    "fields": "id,text,username,hidden",
+                    "limit": max_comments,
+                    "access_token": page_access_token,
+                },
+            )
+            comments = (comments_resp.json() or {}).get("data", []) or []
+
+            for c in comments[:max_comments]:
+                cid = c.get("id")
+                text = c.get("text")
+                if not (cid and text):
+                    continue
+
+                prompt = f"Reply on behalf of the Instagram account. Tone: {tone}. Comment: {text}"
+                draft_reply = await generate_reply(prompt)  # your existing generator
+
+                prepared.append({
+                    "media_id": media_id,
+                    "comment_id": cid,
+                    "original_comment": text,
+                    "reply": draft_reply,
+                    "ig_user_id": ig_user_id,
+                })
+
+    return prepared
+
+
 @app.post("/instagram/prepare_replies")
 async def instagram_prepare_replies(
     tone: str = "friendly",
@@ -1002,16 +1088,23 @@ async def instagram_prepare_replies(
     max_comments: int = 5,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
-    """Prepare draft replies for Instagram comments (placeholder).
+    # Connected?
+    if not token_store.get_token_for_user(current_user.get("id"), provider="instagram"):
+        return {
+            "status": "no_account",
+            "message": "Please connect an Instagram Business or Creator account first.",
+            "replies": [],
+        }
 
-    Since Instagram integration isn't implemented yet, this returns a structured
-    response with status and message fields.
-    """
-    return {
-        "status": "not_implemented",
-        "message": "Instagram integration is not implemented yet.",
-        "replies": []
-    }
+    prepared = await _prepare_instagram_replies(tone, max_posts, max_comments, current_user)
+    if not prepared:
+        return {
+            "status": "no_comments",
+            "message": "No comments found.",
+            "replies": [],
+        }
+
+    return {"status": "ok", "message": "Success", "replies": prepared}
 
 
 @app.post("/instagram/post_replies")
@@ -1021,16 +1114,52 @@ async def instagram_post_replies(
     max_comments: int = 5,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
-    """Post prepared replies to Instagram (placeholder).
+    if not _httpx_available:
+        raise HTTPException(status_code=500, detail="httpx is required for Instagram API interactions")
 
-    Since Instagram integration isn't implemented yet, this returns a structured
-    response with status and message fields.
-    """
-    return {
-        "status": "not_implemented",
-        "message": "Instagram integration is not implemented yet.",
-        "replies_posted": {}
-    }
+    ig_token = token_store.get_token_for_user(current_user.get("id"), provider="instagram")
+    if not ig_token:
+        return {
+            "status": "no_account",
+            "message": "Please connect an Instagram Business or Creator account first.",
+            "replies_posted": {},
+        }
+
+    page_access_token = ig_token.get("page_access_token")
+    if not page_access_token:
+        return {
+            "status": "no_account",
+            "message": "Instagram token not found. Please reconnect Instagram.",
+            "replies_posted": {},
+        }
+
+    prepared = await _prepare_instagram_replies(tone, max_posts, max_comments, current_user)
+    if not prepared:
+        return {
+            "status": "no_comments",
+            "message": "No comments found to reply to.",
+            "replies_posted": {},
+        }
+
+    results: dict[str, int] = {}
+    async with httpx.AsyncClient(timeout=15) as client:
+        for item in prepared:
+            comment_id = item["comment_id"]
+            reply_message = item["reply"]
+            try:
+                # Instagram replies are posted to the comment’s /replies edge
+                await client.post(
+                    f"https://graph.facebook.com/v18.0/{comment_id}/replies",
+                    params={"access_token": page_access_token},
+                    json={"message": reply_message},
+                )
+                ig_user_id = item["ig_user_id"]
+                results[ig_user_id] = results.get(ig_user_id, 0) + 1
+            except Exception:
+                # Skip failures but continue with others
+                continue
+
+    return {"status": "ok", "message": "Replies posted successfully.", "replies_posted": results}
 
 
 # X (formerly Twitter) endpoints
