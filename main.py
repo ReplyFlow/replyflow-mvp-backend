@@ -394,23 +394,28 @@ async def facebook_prepare_replies(
     max_posts: int = 3,
     max_comments: int = 5,
     current_user: dict = Depends(get_current_user),
-) -> list[dict]:
-    """Prepare draft replies for recent comments on connected Facebook Pages.
+) -> dict:
+    page_tokens = token_store.list_tokens()
+    if not page_tokens:
+        return {
+            "status": "no_page_token",
+            "message": "Please connect a Facebook Page first.",
+            "replies": []
+        }
 
-    This endpoint uses the stored Page tokens to fetch a limited number of
-    recent posts and comments, generates replies using the same logic as
-    /generate_reply, and returns the prepared replies without posting them.
-
-    Parameters:
-        tone: The desired tone for the replies (default friendly).
-        max_posts: Maximum number of recent posts to consider per Page (default 3).
-        max_comments: Maximum number of comments to consider per post (default 5).
-
-    Returns:
-        A list of draft replies with comment and post context.
-    """
     prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
-    return prepared
+    if not prepared:
+        return {
+            "status": "no_comments",
+            "message": "No comments found.",
+            "replies": []
+        }
+
+    return {
+        "status": "ok",
+        "message": "Success",
+        "replies": prepared
+    }
 
 
 @app.post("/facebook/post_replies")
@@ -420,84 +425,37 @@ async def facebook_post_replies(
     max_comments: int = 5,
     current_user: dict = Depends(get_current_user),
 ) -> dict:
-    """Fetch comments and post generated replies (requires confirmation).
-
-    This endpoint fetches recent comments and posts replies using the stored Page
-    tokens. Because posting replies to Facebook is an external side effect, the
-    caller must confirm before invoking this endpoint. It is separated from
-    prepare_replies so that you can review the proposed replies first.
-
-    Parameters:
-        tone: The desired tone for the replies (default friendly).
-        max_posts: Maximum number of recent posts to consider per Page (default 3).
-        max_comments: Maximum number of comments to consider per post (default 5).
-
-    Returns:
-        A dict summarizing the number of replies posted per page.
-    """
-    # Ensure httpx is available
+    # Obtain prepared replies from helper
+    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
+    results: dict[str, int] = {}
     if not _httpx_available:
         raise HTTPException(status_code=500, detail="httpx is required for Facebook API interactions")
 
-    results: dict[str, int] = {}
     async with httpx.AsyncClient() as client:
-        found_comments = False
-        for token in token_store.list_tokens():
-            page_id = token.get("page_id")
-            page_token = token.get("page_access_token")
-            if not (page_id and page_token):
+        for item in prepared:
+            page_id = item["page_id"]
+            page_token = None
+            # Retrieve stored page token
+            for t in token_store.list_tokens():
+                if t.get("page_id") == page_id:
+                    page_token = t.get("page_access_token")
+                    break
+            if not page_token:
+                continue
+            comment_id = item["comment_id"]
+            reply_message = item["reply"]
+            try:
+                await client.post(
+                    f"https://graph.facebook.com/v18.0/{comment_id}/comments",
+                    params={"access_token": page_token},
+                    json={"message": reply_message},
+                    timeout=10,
+                )
+                results[page_id] = results.get(page_id, 0) + 1
+            except Exception:
                 continue
 
-            # Fetch recent posts from the Page
-            posts_resp = await client.get(
-                f"https://graph.facebook.com/v18.0/{page_id}/posts",
-                params={
-                    "access_token": page_token,
-                    "fields": "id,message,permalink_url,comments.limit(50){id,message,from,created_time}",
-                    "limit": max_posts,
-                },
-                timeout=10,
-            )
-            posts = posts_resp.json().get("data", [])
-            for post in posts:
-                comments = (post.get("comments") or {}).get("data", [])[:max_comments]
-                for comment in comments:
-                    found_comments = True
-                    prompt = f"Reply on behalf of the Page. Tone: {tone}. Comment: {comment['message']}"
-                    reply_message = await generate_reply(prompt)
-                    comment_id = comment.get("id")
-                    if not comment_id:
-                        continue
-                    try:
-                        await client.post(
-                            f"https://graph.facebook.com/v18.0/{comment_id}/comments",
-                            params={"access_token": page_token},
-                            json={"message": reply_message},
-                            timeout=10,
-                        )
-                        results[page_id] = results.get(page_id, 0) + 1
-                    except Exception:
-                        continue
-
-    if not results and not found_comments:
-        return {
-            "status": "no_comments",
-            "message": "No comments found to reply to.",
-            "replies_posted": results
-        }
-
-    if not results:
-        return {
-            "status": "no_page_token",
-            "message": "Please connect a Facebook Page first.",
-            "replies_posted": results
-        }
-
-    return {
-        "status": "ok",
-        "message": "Replies posted successfully.",
-        "replies_posted": results
-    }
+    return {"replies_posted": results}
 
 
 @app.get("/admin/facebook_tokens")
@@ -1036,6 +994,44 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
     except Exception as e:
         logger.exception("Unexpected error during Instagram callback: %s", e)
         return _redir_instagram("unexpected_error")
+
+@app.post("/instagram/prepare_replies")
+async def instagram_prepare_replies(
+    tone: str = "friendly",
+    max_posts: int = 3,
+    max_comments: int = 5,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Prepare draft replies for Instagram comments (placeholder).
+
+    Since Instagram integration isn't implemented yet, this returns a structured
+    response with status and message fields.
+    """
+    return {
+        "status": "not_implemented",
+        "message": "Instagram integration is not implemented yet.",
+        "replies": []
+    }
+
+
+@app.post("/instagram/post_replies")
+async def instagram_post_replies(
+    tone: str = "friendly",
+    max_posts: int = 3,
+    max_comments: int = 5,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    """Post prepared replies to Instagram (placeholder).
+
+    Since Instagram integration isn't implemented yet, this returns a structured
+    response with status and message fields.
+    """
+    return {
+        "status": "not_implemented",
+        "message": "Instagram integration is not implemented yet.",
+        "replies_posted": {}
+    }
+
 
 # X (formerly Twitter) endpoints
 @app.get("/x/login")
