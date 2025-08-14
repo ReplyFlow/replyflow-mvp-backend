@@ -404,9 +404,9 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
           status_code=302,
       )
 
-        app_id = os.getenv("FACEBOOK_APP_ID")
-        app_secret = os.getenv("FACEBOOK_APP_SECRET")
-        redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
+      app_id = os.getenv("FACEBOOK_APP_ID")
+      app_secret = os.getenv("FACEBOOK_APP_SECRET")
+      redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
 
     if not (app_id and app_secret and redirect_uri):
         logging.error("Missing Facebook config environment variables")
