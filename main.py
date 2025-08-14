@@ -388,76 +388,6 @@ async def _prepare_facebook_replies(tone: str = "friendly", max_posts: int = 3, 
     return prepared
 
 
-@app.post("/facebook/prepare_replies")
-async def facebook_prepare_replies(
-    tone: str = "friendly",
-    max_posts: int = 3,
-    max_comments: int = 5,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    page_tokens = token_store.list_tokens()
-    if not page_tokens:
-        return {
-            "status": "no_page_token",
-            "message": "Please connect a Facebook Page first.",
-            "replies": []
-        }
-
-    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
-    if not prepared:
-        return {
-            "status": "no_comments",
-            "message": "No comments found.",
-            "replies": []
-        }
-
-    return {
-        "status": "ok",
-        "message": "Success",
-        "replies": prepared
-    }
-
-
-@app.post("/facebook/post_replies")
-async def facebook_post_replies(
-    tone: str = "friendly",
-    max_posts: int = 3,
-    max_comments: int = 5,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    # Obtain prepared replies from helper
-    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
-    results: dict[str, int] = {}
-    if not _httpx_available:
-        raise HTTPException(status_code=500, detail="httpx is required for Facebook API interactions")
-
-    async with httpx.AsyncClient() as client:
-        for item in prepared:
-            page_id = item["page_id"]
-            page_token = None
-            # Retrieve stored page token
-            for t in token_store.list_tokens():
-                if t.get("page_id") == page_id:
-                    page_token = t.get("page_access_token")
-                    break
-            if not page_token:
-                continue
-            comment_id = item["comment_id"]
-            reply_message = item["reply"]
-            try:
-                await client.post(
-                    f"https://graph.facebook.com/v18.0/{comment_id}/comments",
-                    params={"access_token": page_token},
-                    json={"message": reply_message},
-                    timeout=10,
-                )
-                results[page_id] = results.get(page_id, 0) + 1
-            except Exception:
-                continue
-
-    return {"replies_posted": results}
-
-
 @app.get("/admin/facebook_tokens")
 def list_facebook_tokens(current_user: dict = Depends(get_current_user)) -> list[dict]:
     """Return all stored Facebook page and user access tokens.
@@ -565,12 +495,83 @@ async def facebook_callback(code: str, state: Optional[str] = None):
                 if page_id and page_token:
                     token_store.save_token(page_id, page_token, access_token)
 
+        # After retrieving a Page's id and access token in /facebook/callback
+        token_store.save_token(
+            user_id=current_user_id,      # whoever logged in
+            provider="facebook",
+            page_id=page["id"],
+            page_access_token=page["access_token"],
+            ig_account_id=None,           # None for Facebook
+            user_access_token=user_access_token  # optional if you store it
+        )
+
+
         # Success
         return _redir(None)
 
     except Exception as e:
         logging.exception("Unexpected error in Facebook callback")
         return _redir("unexpected_error")
+
+@app.post("/facebook/prepare_replies")
+async def facebook_prepare_replies(..., current_user: dict = Depends(get_current_user)):
+    page_token = token_store.get_page_token(current_user["id"], "facebook")
+    if not page_token:
+        return {"status":"no_page_token", "message":"Please connect a Facebook Page first.","replies":[]}
+    # …now call the Graph API with page_token…
+
+    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
+    if not prepared:
+        return {
+            "status": "no_comments",
+            "message": "No comments found.",
+            "replies": []
+        }
+
+    return {
+        "status": "ok",
+        "message": "Success",
+        "replies": prepared
+    }
+
+@app.post("/facebook/post_replies")
+async def facebook_post_replies(
+    tone: str = "friendly",
+    max_posts: int = 3,
+    max_comments: int = 5,
+    current_user: dict = Depends(get_current_user),
+) -> dict:
+    # Obtain prepared replies from helper
+    prepared = await _prepare_facebook_replies(tone, max_posts, max_comments)
+    results: dict[str, int] = {}
+    if not _httpx_available:
+        raise HTTPException(status_code=500, detail="httpx is required for Facebook API interactions")
+
+    async with httpx.AsyncClient() as client:
+        for item in prepared:
+            page_id = item["page_id"]
+            page_token = None
+            # Retrieve stored page token
+            for t in token_store.list_tokens():
+                if t.get("page_id") == page_id:
+                    page_token = t.get("page_access_token")
+                    break
+            if not page_token:
+                continue
+            comment_id = item["comment_id"]
+            reply_message = item["reply"]
+            try:
+                await client.post(
+                    f"https://graph.facebook.com/v18.0/{comment_id}/comments",
+                    params={"access_token": page_token},
+                    json={"message": reply_message},
+                    timeout=10,
+                )
+                results[page_id] = results.get(page_id, 0) + 1
+            except Exception:
+                continue
+
+    return {"replies_posted": results}
 
 
 async def generate_with_openai(comment: str, tone: str) -> str:
@@ -980,16 +981,15 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
                     break
 
             # 5) Persist what you need so your app can act (example)
-            # token_store.save_token(f"ig:{ig_account_id}", page_access_token, long_lived_user_token)
-            # token_store.save_token(f"page:{page_id}", page_access_token, long_lived_user_token)
-
-          # After you have a long-lived user token and a Page with ig account:
-            # page: { id, access_token, instagram_business_account: { id: <IG_USER_ID> } }
+                                                                                                                                                                                      
+            # After exchanging code for a token and finding IG business account and page token
             token_store.save_token(
                 user_id=current_user_id,
                 provider="instagram",
+                page_id=page["id"],
+                page_access_token=page["access_token"],
                 ig_account_id=ig_user_id,
-                page_access_token=page_token,
+                user_access_token=long_lived_user_token
             )
 
 
@@ -1004,6 +1004,13 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
     except Exception as e:
         logger.exception("Unexpected error during Instagram callback: %s", e)
         return _redir_instagram("unexpected_error")
+
+@app.post("/instagram/prepare_replies")
+async def instagram_prepare_replies(..., current_user: dict = Depends(get_current_user)):
+    page_token = token_store.get_page_token(current_user["id"], "instagram")
+    if not page_token:
+        return {"status":"no_account", "message":"Please connect an Instagram Business or Creator account first.","replies":[]}
+    # …now call the Instagram Graph API…
 
 # ---- Instagram helpers ------------------------------------------------------
 async def _prepare_instagram_replies(
