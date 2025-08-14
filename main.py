@@ -481,8 +481,8 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
                   )
   
   
-        # Success
-        return _redir(None)
+          # Success
+          return _redir(None)
 
   except Exception as e:
       logging.exception("Unexpected error in Facebook callback")
