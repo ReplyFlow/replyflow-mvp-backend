@@ -46,6 +46,7 @@ import hashlib
 import secrets
 import logging
 import httpx
+import urllib.parse
 from typing import Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
