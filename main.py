@@ -389,8 +389,8 @@ async def facebook_login() -> RedirectResponse:
 async def facebook_callback(request: Request, code: str, state: Optional[str] = None):
   """Handle the OAuth callback from Facebook, exchange the code, and redirect to dashboard."""
     
-    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
-    DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
+  FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
+  DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
 
     def _redir(reason: Optional[str] = None):
         """Internal helper for building redirect URLs."""
