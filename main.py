@@ -437,52 +437,52 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
               return _redir("no_access_token")
 
 
-    # Determine current user ID from Authorization header or session cookie
-    session_token: Optional[str] = None
-    auth_header = request.headers.get("Authorization")
-    if auth_header and auth_header.startswith("Bearer "):
-        session_token = auth_header.split(" ", 1)[1].strip()
-    if not session_token:
-        session_token = request.cookies.get("session_token")
-    current_user_id = session_store.get_user_id(session_token) if session_token else None
-
-    # Exchange code → access_token, then request Pages…
-    access_token = token_data.get("access_token")
-    pages_resp = await client.get(
-        "https://graph.facebook.com/v18.0/me/accounts",
-        params={"access_token": access_token},
-        timeout=10,
-    )
-    pages_data = pages_resp.json()
-
+      # Determine current user ID from Authorization header or session cookie
+      session_token: Optional[str] = None
+      auth_header = request.headers.get("Authorization")
+      if auth_header and auth_header.startswith("Bearer "):
+          session_token = auth_header.split(" ", 1)[1].strip()
+      if not session_token:
+          session_token = request.cookies.get("session_token")
+      current_user_id = session_store.get_user_id(session_token) if session_token else None
   
-    # Loop through pages and store tokens for the current user
-        # Exchange code → access_token, then request Pages…
-    access_token = token_data.get("access_token")
-    pages_resp = await client.get(
-        "https://graph.facebook.com/v18.0/me/accounts",
-        params={"access_token": access_token},
-        timeout=10,
-    )
-    pages_data = pages_resp.json()
-
-    # Persist each Page token for this user
-    if current_user_id:
-        for page in pages_data.get("data", []):
-            page_id = page.get("id")
-            page_access_token = page.get("access_token")
-            if page_id and page_access_token:
-                token_store.save_token(
-                    user_id=current_user_id,
-                    provider="facebook",
-                    page_id=page_id,
-                    page_access_token=page_access_token,
-                    user_access_token=access_token
-                )
-
-
-      # Success
-      return _redir(None)
+      # Exchange code → access_token, then request Pages…
+      access_token = token_data.get("access_token")
+      pages_resp = await client.get(
+          "https://graph.facebook.com/v18.0/me/accounts",
+          params={"access_token": access_token},
+          timeout=10,
+      )
+      pages_data = pages_resp.json()
+  
+    
+      # Loop through pages and store tokens for the current user
+          # Exchange code → access_token, then request Pages…
+      access_token = token_data.get("access_token")
+      pages_resp = await client.get(
+          "https://graph.facebook.com/v18.0/me/accounts",
+          params={"access_token": access_token},
+          timeout=10,
+      )
+      pages_data = pages_resp.json()
+  
+      # Persist each Page token for this user
+      if current_user_id:
+          for page in pages_data.get("data", []):
+              page_id = page.get("id")
+              page_access_token = page.get("access_token")
+              if page_id and page_access_token:
+                  token_store.save_token(
+                      user_id=current_user_id,
+                      provider="facebook",
+                      page_id=page_id,
+                      page_access_token=page_access_token,
+                      user_access_token=access_token
+                  )
+  
+  
+        # Success
+        return _redir(None)
 
   except Exception as e:
       logging.exception("Unexpected error in Facebook callback")
