@@ -37,7 +37,6 @@ comments from supported platforms via their respective APIs.
 
 import os
 import json
-import urllib.parse
 import uuid
 import datetime
 import time
@@ -52,6 +51,7 @@ from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse, HTMLResponse
 from pydantic import BaseModel
 from urllib.parse import urlencode, quote_plus
+from token_store import TokenStore
 
 try:
     import openai  # type: ignore
@@ -166,7 +166,8 @@ class FacebookTokenStore:
 
 # Initialize a global token store. You can override the storage path by setting
 # the FACEBOOK_TOKEN_STORE environment variable.
-token_store = FacebookTokenStore()
+# token_store = FacebookTokenStore()
+token_store = TokenStore()
 
 # -----------------------------------------------------------------------------
 # Simple user and session management
@@ -1005,12 +1006,6 @@ async def instagram_callback(request: Request, code: Optional[str] = None, state
         logger.exception("Unexpected error during Instagram callback: %s", e)
         return _redir_instagram("unexpected_error")
 
-@app.post("/instagram/prepare_replies")
-async def instagram_prepare_replies(..., current_user: dict = Depends(get_current_user)):
-    page_token = token_store.get_page_token(current_user["id"], "instagram")
-    if not page_token:
-        return {"status":"no_account", "message":"Please connect an Instagram Business or Creator account first.","replies":[]}
-    # …now call the Instagram Graph API…
 
 # ---- Instagram helpers ------------------------------------------------------
 async def _prepare_instagram_replies(
@@ -1089,19 +1084,11 @@ async def _prepare_instagram_replies(
 
 
 @app.post("/instagram/prepare_replies")
-async def instagram_prepare_replies(
-    tone: str = "friendly",
-    max_posts: int = 3,
-    max_comments: int = 5,
-    current_user: dict = Depends(get_current_user),
-) -> dict:
-    # Connected?
-    if not token_store.get_token_for_user(current_user.get("id"), provider="instagram"):
-        return {
-            "status": "no_account",
-            "message": "Please connect an Instagram Business or Creator account first.",
-            "replies": [],
-        }
+async def instagram_prepare_replies(..., current_user: dict = Depends(get_current_user)):
+    page_token = token_store.get_page_token(current_user["id"], "instagram")
+    if not page_token:
+        return {"status":"no_account", "message":"Please connect an Instagram Business or Creator account first.","replies":[]}
+    # …now call the Instagram Graph API…
 
     prepared = await _prepare_instagram_replies(tone, max_posts, max_comments, current_user)
     if not prepared:
