@@ -408,73 +408,73 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
       app_secret = os.getenv("FACEBOOK_APP_SECRET")
       redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
 
-    if not (app_id and app_secret and redirect_uri):
-        logging.error("Missing Facebook config environment variables")
-        return _redir("missing_config")
+  if not (app_id and app_secret and redirect_uri):
+      logging.error("Missing Facebook config environment variables")
+      return _redir("missing_config")
 
-    if not _httpx_available:
-        logging.error("httpx is not available")
-        return _redir("httpx_unavailable")
+  if not _httpx_available:
+      logging.error("httpx is not available")
+      return _redir("httpx_unavailable")
 
-    try:
-        # Exchange code for a short-lived user access token
-        token_params = {
-            "client_id": app_id,
-            "client_secret": app_secret,
-            "redirect_uri": redirect_uri,
-            "code": code,
-        }
-        async with httpx.AsyncClient() as client:
-            token_resp = await client.get(
-                "https://graph.facebook.com/v18.0/oauth/access_token",
-                params=token_params,
-                timeout=10,
-            )
-            token_data = token_resp.json()
-            access_token = token_data.get("access_token")
-            if not access_token:
-                logging.error(f"Failed to obtain access token: {token_data}")
-                return _redir("no_access_token")
-
-
-        # Determine current user ID from Authorization header or session cookie
-        session_token: Optional[str] = None
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            session_token = auth_header.split(" ", 1)[1].strip()
-        if not session_token:
-            session_token = request.cookies.get("session_token")
-        current_user_id = session_store.get_user_id(session_token) if session_token else None
-
-        # Request the Pages managed by the user
-        pages_resp = await client.get(
-            "https://graph.facebook.com/v18.0/me/accounts",
-            params={"access_token": access_token},
-            timeout=10,
-        )
-        pages_data = pages_resp.json()
-
-      
-        # Loop through pages and store tokens for the current user
-        for page in pages_data.get("data", []):
-            page_id = page.get("id")
-            page_access_token = page.get("access_token")
-            if page_id and page_access_token and current_user_id:
-                token_store.save_token(
-                    user_id=current_user_id,
-                    provider="facebook",
-                    page_id=page_id,
-                    page_access_token=page_access_token,
-                    user_access_token=access_token
-                )
+  try:
+      # Exchange code for a short-lived user access token
+      token_params = {
+          "client_id": app_id,
+          "client_secret": app_secret,
+          "redirect_uri": redirect_uri,
+          "code": code,
+      }
+      async with httpx.AsyncClient() as client:
+          token_resp = await client.get(
+              "https://graph.facebook.com/v18.0/oauth/access_token",
+              params=token_params,
+              timeout=10,
+          )
+          token_data = token_resp.json()
+          access_token = token_data.get("access_token")
+          if not access_token:
+              logging.error(f"Failed to obtain access token: {token_data}")
+              return _redir("no_access_token")
 
 
-        # Success
-        return _redir(None)
+      # Determine current user ID from Authorization header or session cookie
+      session_token: Optional[str] = None
+      auth_header = request.headers.get("Authorization")
+      if auth_header and auth_header.startswith("Bearer "):
+          session_token = auth_header.split(" ", 1)[1].strip()
+      if not session_token:
+          session_token = request.cookies.get("session_token")
+      current_user_id = session_store.get_user_id(session_token) if session_token else None
 
-    except Exception as e:
-        logging.exception("Unexpected error in Facebook callback")
-        return _redir("unexpected_error")
+      # Request the Pages managed by the user
+      pages_resp = await client.get(
+          "https://graph.facebook.com/v18.0/me/accounts",
+          params={"access_token": access_token},
+          timeout=10,
+      )
+      pages_data = pages_resp.json()
+
+    
+      # Loop through pages and store tokens for the current user
+      for page in pages_data.get("data", []):
+          page_id = page.get("id")
+          page_access_token = page.get("access_token")
+          if page_id and page_access_token and current_user_id:
+              token_store.save_token(
+                  user_id=current_user_id,
+                  provider="facebook",
+                  page_id=page_id,
+                  page_access_token=page_access_token,
+                  user_access_token=access_token
+              )
+
+
+      # Success
+      return _redir(None)
+
+  except Exception as e:
+      logging.exception("Unexpected error in Facebook callback")
+      return _redir("unexpected_error")
 
 @app.post("/facebook/prepare_replies")
 async def facebook_prepare_replies(current_user: dict = Depends(get_current_user)):
