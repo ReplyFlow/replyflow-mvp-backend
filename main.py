@@ -386,8 +386,8 @@ async def facebook_login() -> RedirectResponse:
 
 
 @app.get("/facebook/callback")
-async def facebook_callback(code: str, state: Optional[str] = None):
-    """Handle the OAuth callback from Facebook, exchange the code, and redirect to dashboard."""
+async def facebook_callback(request: Request, code: str, state: Optional[str] = None):
+  """Handle the OAuth callback from Facebook, exchange the code, and redirect to dashboard."""
     
     FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
     DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
@@ -436,17 +436,26 @@ async def facebook_callback(code: str, state: Optional[str] = None):
                 logging.error(f"Failed to obtain access token: {token_data}")
                 return _redir("no_access_token")
 
-            # Request the Pages managed by the user
-            pages_resp = await client.get(
-                "https://graph.facebook.com/v18.0/me/accounts",
-                params={"access_token": access_token},
-                timeout=10,
-            )
-            pages_data = pages_resp.json()
 
-        # Determine the current user’s ID from the session
-        current_user_id = session_store.get_user_id(request.cookies.get('session_token'))
-        # Loop through pages and store the first one (or all)
+        # Determine current user ID from Authorization header or session cookie
+        session_token: Optional[str] = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            session_token = auth_header.split(" ", 1)[1].strip()
+        if not session_token:
+            session_token = request.cookies.get("session_token")
+        current_user_id = session_store.get_user_id(session_token) if session_token else None
+
+        # Request the Pages managed by the user
+        pages_resp = await client.get(
+            "https://graph.facebook.com/v18.0/me/accounts",
+            params={"access_token": access_token},
+            timeout=10,
+        )
+        pages_data = pages_resp.json()
+
+      
+        # Loop through pages and store tokens for the current user
         for page in pages_data.get("data", []):
             page_id = page.get("id")
             page_access_token = page.get("access_token")
@@ -458,17 +467,6 @@ async def facebook_callback(code: str, state: Optional[str] = None):
                     page_access_token=page_access_token,
                     user_access_token=access_token
                 )
-
-
-        # After retrieving a Page's id and access token in /facebook/callback
-        token_store.save_token(
-            user_id=current_user_id,      # whoever logged in
-            provider="facebook",
-            page_id=page["id"],
-            page_access_token=page["access_token"],
-            ig_account_id=None,           # None for Facebook
-            user_access_token=user_access_token  # optional if you store it
-        )
 
 
         # Success
