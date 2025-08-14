@@ -515,7 +515,7 @@ async def facebook_callback(code: str, state: Optional[str] = None):
         return _redir("unexpected_error")
 
 @app.post("/facebook/prepare_replies")
-async def facebook_prepare_replies(..., current_user: dict = Depends(get_current_user)):
+async def facebook_prepare_replies(current_user: dict = Depends(get_current_user)):
     page_token = token_store.get_page_token(current_user["id"], "facebook")
     if not page_token:
         return {"status":"no_page_token", "message":"Please connect a Facebook Page first.","replies":[]}
@@ -1084,7 +1084,7 @@ async def _prepare_instagram_replies(
 
 
 @app.post("/instagram/prepare_replies")
-async def instagram_prepare_replies(..., current_user: dict = Depends(get_current_user)):
+async def instagram_prepare_replies(current_user: dict = Depends(get_current_user)):
     page_token = token_store.get_page_token(current_user["id"], "instagram")
     if not page_token:
         return {"status":"no_account", "message":"Please connect an Instagram Business or Creator account first.","replies":[]}
