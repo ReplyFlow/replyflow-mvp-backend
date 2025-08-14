@@ -392,17 +392,17 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
   FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
   DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
 
-    def _redir(reason: Optional[str] = None):
-        """Internal helper for building redirect URLs."""
-        if reason:
-            return RedirectResponse(
-                url=f"{DASHBOARD_URL}?connected=facebook&error=1&reason={quote_plus(reason)}",
-                status_code=302,
-            )
-        return RedirectResponse(
-            url=f"{DASHBOARD_URL}?connected=facebook",
-            status_code=302,
-        )
+  def _redir(reason: Optional[str] = None):
+      """Internal helper for building redirect URLs."""
+      if reason:
+          return RedirectResponse(
+              url=f"{DASHBOARD_URL}?connected=facebook&error=1&reason={quote_plus(reason)}",
+              status_code=302,
+          )
+      return RedirectResponse(
+          url=f"{DASHBOARD_URL}?connected=facebook",
+          status_code=302,
+      )
 
     app_id = os.getenv("FACEBOOK_APP_ID")
     app_secret = os.getenv("FACEBOOK_APP_SECRET")
