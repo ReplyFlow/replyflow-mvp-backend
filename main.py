@@ -121,53 +121,8 @@ FACEBOOK_SCOPES = [
     "pages_show_list"
 ]
 
-class FacebookTokenStore:
-    """A simple file-based store for Facebook tokens.
-
-    Tokens are persisted to a JSON file so that they survive server restarts.
-    Each entry in the store is a dictionary with keys:
-      - page_id: The ID of the Facebook Page
-      - page_access_token: The token that allows posting on behalf of the Page
-      - user_access_token: The user-level access token returned by OAuth
-      - created_at: UTC timestamp when the token was stored
-
-    In a production system you should encrypt these values and associate
-    them with your application user. This store is only for demonstration.
-    """
-
-    def __init__(self, path: str | None = None) -> None:
-        self.path = path or os.getenv("FACEBOOK_TOKEN_STORE", "facebook_tokens.json")
-        # Ensure file exists
-        if not os.path.exists(self.path):
-            with open(self.path, "w", encoding="utf-8") as fh:
-                json.dump([], fh)
-
-    def _load(self) -> list[dict]:
-        try:
-            with open(self.path, "r", encoding="utf-8") as fh:
-                data = json.load(fh)
-                return data if isinstance(data, list) else []
-        except Exception:
-            return []
-
-    def save_token(self, page_id: str, page_access_token: str, user_access_token: str) -> None:
-        tokens = self._load()
-        tokens.append({
-            "page_id": page_id,
-            "page_access_token": page_access_token,
-            "user_access_token": user_access_token,
-            "created_at": datetime.datetime.utcnow().isoformat() + "Z",
-        })
-        with open(self.path, "w", encoding="utf-8") as fh:
-            json.dump(tokens, fh)
-
-    def list_tokens(self) -> list[dict]:
-        return self._load()
-
 
 # Initialize a global token store. You can override the storage path by setting
-# the FACEBOOK_TOKEN_STORE environment variable.
-# token_store = FacebookTokenStore()
 token_store = TokenStore()
 
 # -----------------------------------------------------------------------------
@@ -489,13 +444,21 @@ async def facebook_callback(code: str, state: Optional[str] = None):
             )
             pages_data = pages_resp.json()
 
-        # Store tokens for each page the user manages
-        if pages_data and "data" in pages_data:
-            for page in pages_data.get("data", []):
-                page_id = page.get("id")
-                page_token = page.get("access_token")
-                if page_id and page_token:
-                    token_store.save_token(page_id, page_token, access_token)
+        # Determine the current user’s ID from the session
+        current_user_id = session_store.get_user_id(request.cookies.get('session_token'))
+        # Loop through pages and store the first one (or all)
+        for page in pages_data.get("data", []):
+            page_id = page.get("id")
+            page_access_token = page.get("access_token")
+            if page_id and page_access_token and current_user_id:
+                token_store.save_token(
+                    user_id=current_user_id,
+                    provider="facebook",
+                    page_id=page_id,
+                    page_access_token=page_access_token,
+                    user_access_token=access_token
+                )
+
 
         # After retrieving a Page's id and access token in /facebook/callback
         token_store.save_token(
