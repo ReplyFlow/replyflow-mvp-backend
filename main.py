@@ -362,7 +362,7 @@ async def facebook_login(request: Request):
     redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
     scope = ",".join(FACEBOOK_SCOPES)
 
-    # Grab session token from cookie or header
+    # Determine session token from Authorization header or cookie
     session_token = None
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
@@ -370,7 +370,7 @@ async def facebook_login(request: Request):
     if not session_token:
         session_token = request.cookies.get("session_token")
 
-    # If the user is not logged in, redirect them to /login
+    # If not logged in, redirect to your frontend login page
     if not session_token:
         return RedirectResponse(url=f"{FRONTEND_BASE_URL}/login.html", status_code=302)
 
@@ -388,69 +388,31 @@ async def facebook_login(request: Request):
 
 @app.get("/facebook/callback")
 async def facebook_callback(request: Request, code: str, state: Optional[str] = None):
-    """Handle the OAuth callback from Facebook, exchange the code, and redirect to dashboard."""
-
-    FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "https://replyflowapp.com")
-    DASHBOARD_URL = os.getenv("DASHBOARD_URL", f"{FRONTEND_BASE_URL}/dashboard.html")
-
-    def _redir(reason: Optional[str] = None):
-        if reason:
-            return RedirectResponse(
-                url=f"{DASHBOARD_URL}?connected=facebook&error=1&reason={quote_plus(reason)}",
-                status_code=302,
-            )
-        return RedirectResponse(
-            url=f"{DASHBOARD_URL}?connected=facebook",
-            status_code=302,
-        )
-
-    app_id = os.getenv("FACEBOOK_APP_ID")
-    app_secret = os.getenv("FACEBOOK_APP_SECRET")
-    redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
-
-    if not (app_id and app_secret and redirect_uri):
-        logging.error("Missing Facebook config environment variables")
-        return _redir("missing_config")
-
-    if not _httpx_available:
-        logging.error("httpx is not available")
-        return _redir("httpx_unavailable")
 
     try:
-        # Exchange code for a short-lived user access token
-        token_params = {
-            "client_id": app_id,
-            "client_secret": app_secret,
-            "redirect_uri": redirect_uri,
-            "code": code,
-        }
-
+        # Exchange code for user access token
         async with httpx.AsyncClient() as client:
-            token_resp = await client.get(
+          token_resp = await client.get(
                 "https://graph.facebook.com/v18.0/oauth/access_token",
-                params=token_params,
+                params={
+                    "client_id": app_id,
+                    "client_secret": app_secret,
+                    "redirect_uri": redirect_uri,
+                    "code": code,
+                },
                 timeout=10,
             )
             token_data = token_resp.json()
             access_token = token_data.get("access_token")
             if not access_token:
-                logging.error(f"Failed to obtain access token: {token_data}")
                 return _redir("no_access_token")
-    
-            # Determine current user ID from Authorization header or session cookie
-            session_token: Optional[str] = None
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                session_token = auth_header.split(" ", 1)[1].strip()
-            if not session_token:
-                # session_token = request.cookies.get("session_token")
-                session_token = state
-                current_user_id = session_store.get_user_id(session_token) if session_token else None
-    
-            # If user not found, stop
+
+            # Use state (session token) to identify the user
+            session_token = state
+            current_user_id = session_store.get_user_id(session_token) if session_token else None
             if not current_user_id:
                 return _redir("no_user")
-    
+
             # Fetch Pages managed by the user
             pages_resp = await client.get(
                 "https://graph.facebook.com/v18.0/me/accounts",
@@ -458,23 +420,21 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
                 timeout=10,
             )
             pages_data = pages_resp.json()
-    
-                # Save access tokens per page
-            if current_user_id:
-              for page in pages_data.get("data", []):
-                  page_id = page.get("id")
-                  page_access_token = page.get("access_token")
-                  if page_id and page_access_token:
-                      token_store.save_token(
-                          user_id=current_user_id,
-                          provider="facebook",
-                          page_id=page_id,
-                          page_access_token=page_access_token,
-                          user_access_token=access_token
-                      )
-    
-            return _redir(None)
 
+            # Save each Page token for this user
+            for page in pages_data.get("data", []):
+                page_id = page.get("id")
+                page_access_token = page.get("access_token")
+                if page_id and page_access_token:
+                    token_store.save_token(
+                        user_id=current_user_id,
+                        provider="facebook",
+                        page_id=page_id,
+                        page_access_token=page_access_token,
+                        user_access_token=access_token
+                    )
+
+        return _redir(None)
     except Exception as e:
         logging.exception("Unexpected error in Facebook callback")
         return _redir("unexpected_error")
