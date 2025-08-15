@@ -402,37 +402,37 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
                 },
                 timeout=10,
             )
-            token_data = token_resp.json()
-            access_token = token_data.get("access_token")
-            if not access_token:
-                return _redir("no_access_token")
+          token_data = token_resp.json()
+          access_token = token_data.get("access_token")
+          if not access_token:
+              return _redir("no_access_token")
 
-            # Use state (session token) to identify the user
-            session_token = state
-            current_user_id = session_store.get_user_id(session_token) if session_token else None
-            if not current_user_id:
-                return _redir("no_user")
+          # Use state (session token) to identify the user
+          session_token = state
+          current_user_id = session_store.get_user_id(session_token) if session_token else None
+          if not current_user_id:
+              return _redir("no_user")
 
-            # Fetch Pages managed by the user
-            pages_resp = await client.get(
-                "https://graph.facebook.com/v18.0/me/accounts",
-                params={"access_token": access_token},
-                timeout=10,
-            )
-            pages_data = pages_resp.json()
+          # Fetch Pages managed by the user
+          pages_resp = await client.get(
+              "https://graph.facebook.com/v18.0/me/accounts",
+              params={"access_token": access_token},
+              timeout=10,
+          )
+          pages_data = pages_resp.json()
 
-            # Save each Page token for this user
-            for page in pages_data.get("data", []):
-                page_id = page.get("id")
-                page_access_token = page.get("access_token")
-                if page_id and page_access_token:
-                    token_store.save_token(
-                        user_id=current_user_id,
-                        provider="facebook",
-                        page_id=page_id,
-                        page_access_token=page_access_token,
-                        user_access_token=access_token
-                    )
+          # Save each Page token for this user
+          for page in pages_data.get("data", []):
+              page_id = page.get("id")
+              page_access_token = page.get("access_token")
+              if page_id and page_access_token:
+                  token_store.save_token(
+                      user_id=current_user_id,
+                      provider="facebook",
+                      page_id=page_id,
+                      page_access_token=page_access_token,
+                      user_access_token=access_token
+                  )
 
         return _redir(None)
     except Exception as e:
