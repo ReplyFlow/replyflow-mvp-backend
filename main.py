@@ -369,6 +369,8 @@ async def facebook_login(request: Request):
         session_token = auth_header.split(" ", 1)[1].strip()
     if not session_token:
         session_token = request.cookies.get("session_token")
+    if not session_token:
+        session_token = request.query_params.get("token")
 
     # If not logged in, redirect to your frontend login page
     if not session_token:
