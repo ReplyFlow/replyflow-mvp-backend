@@ -475,9 +475,9 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
 
         return _redir(None)
 
-  except Exception as e:
-      logging.exception("Unexpected error in Facebook callback")
-      return _redir("unexpected_error")
+except Exception as e:
+    logging.exception("Unexpected error in Facebook callback")
+    return _redir("unexpected_error")
 
 @app.post("/facebook/prepare_replies")
 async def facebook_prepare_replies(
