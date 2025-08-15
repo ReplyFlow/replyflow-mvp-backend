@@ -357,32 +357,33 @@ def list_facebook_tokens(current_user: dict = Depends(get_current_user)) -> list
 
 
 @app.get("/facebook/login")
-async def facebook_login() -> RedirectResponse:
-    """Redirect the user to Facebook's OAuth authorization dialog.
-
-    This endpoint constructs the Facebook OAuth URL with the configured
-    app ID, redirect URI and requested scopes. It then issues a redirect
-    response so the user's browser navigates to Facebook to authorize the
-    app. The state parameter is a random UUID to mitigate CSRF attacks.
-    """
+async def facebook_login(request: Request):
     client_id = os.getenv("FACEBOOK_APP_ID")
     redirect_uri = os.getenv("FACEBOOK_REDIRECT_URI")
-    if not client_id or not redirect_uri:
-        raise HTTPException(
-            status_code=500,
-            detail="FACEBOOK_APP_ID and FACEBOOK_REDIRECT_URI must be set in the environment",
-        )
-    state = uuid.uuid4().hex
-    params = {
-        "client_id": client_id,
-        "redirect_uri": redirect_uri,
-        "scope": ",".join(FACEBOOK_SCOPES),
-        "response_type": "code",
-        "state": state,
-    }
-    auth_url = "https://www.facebook.com/v18.0/dialog/oauth"
-    url = f"{auth_url}?{urllib.parse.urlencode(params)}"
-    return RedirectResponse(url)
+    scope = ",".join(FACEBOOK_SCOPES)
+
+    # Grab session token from cookie or header
+    session_token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        session_token = auth_header.split(" ", 1)[1].strip()
+    if not session_token:
+        session_token = request.cookies.get("session_token")
+
+    # If the user is not logged in, redirect them to /login
+    if not session_token:
+        return RedirectResponse(url="/login")
+
+    state = session_token  # Use session token as state
+    auth_url = (
+        f"https://www.facebook.com/v18.0/dialog/oauth?"
+        f"client_id={client_id}&"
+        f"redirect_uri={redirect_uri}&"
+        f"scope={scope}&"
+        f"response_type=code&"
+        f"state={state}"
+    )
+    return RedirectResponse(url=auth_url)
 
 
 @app.get("/facebook/callback")
@@ -424,54 +425,53 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
             "code": code,
         }
 
-        async with httpx.AsyncClient() as client:
-            token_resp = await client.get(
-                "https://graph.facebook.com/v18.0/oauth/access_token",
-                params=token_params,
-                timeout=10,
-            )
-            token_data = token_resp.json()
-            access_token = token_data.get("access_token")
-            if not access_token:
-                logging.error(f"Failed to obtain access token: {token_data}")
-                return _redir("no_access_token")
+    async with httpx.AsyncClient() as client:
+        token_resp = await client.get(
+            "https://graph.facebook.com/v18.0/oauth/access_token",
+            params=token_params,
+            timeout=10,
+        )
+        token_data = token_resp.json()
+        access_token = token_data.get("access_token")
+        if not access_token:
+            logging.error(f"Failed to obtain access token: {token_data}")
+            return _redir("no_access_token")
 
-            # Determine current user ID from Authorization header or session cookie
-            session_token: Optional[str] = None
-            auth_header = request.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                session_token = auth_header.split(" ", 1)[1].strip()
-            if not session_token:
-                session_token = request.cookies.get("session_token")
+        # Determine current user ID from Authorization header or session cookie
+        session_token: Optional[str] = None
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            session_token = auth_header.split(" ", 1)[1].strip()
+        if not session_token:
+            # session_token = request.cookies.get("session_token")
+            session_token = state
             current_user_id = session_store.get_user_id(session_token) if session_token else None
 
-            # If user not found, stop
-            if not current_user_id:
-                return _redir("no_user")
+        # If user not found, stop
+        if not current_user_id:
+            return _redir("no_user")
 
-            # Fetch Pages managed by the user
-            pages_resp = await client.get(
-                "https://graph.facebook.com/v18.0/me/accounts",
-                params={"access_token": access_token},
-                timeout=10,
-            )
-            pages_data = pages_resp.json()
+        # Fetch Pages managed by the user
+        pages_resp = await client.get(
+            "https://graph.facebook.com/v18.0/me/accounts",
+            params={"access_token": access_token},
+            timeout=10,
+        )
+        pages_data = pages_resp.json()
 
             # Save access tokens per page
-            for page in pages_data.get("data", []):
-              logging.info(f"[CALLBACK] Saving page token for page {page_id} user {current_user_id}")
+        if current_user_id:
+          for page in pages_data.get("data", []):
               page_id = page.get("id")
               page_access_token = page.get("access_token")
               if page_id and page_access_token:
-                logging.info(f"[CALLBACK] current_user_id = {current_user_id}")
-                logging.info(f"[CALLBACK] pages = {pages_data.get('data', [])}")
-                token_store.save_token(
-                    user_id=current_user_id,
-                    provider="facebook",
-                    page_id=page_id,
-                    page_access_token=page_access_token,
-                    user_access_token=access_token
-                )
+                  token_store.save_token(
+                      user_id=current_user_id,
+                      provider="facebook",
+                      page_id=page_id,
+                      page_access_token=page_access_token,
+                      user_access_token=access_token
+                  )
 
         return _redir(None)
 
