@@ -372,7 +372,7 @@ async def facebook_login(request: Request):
 
     # If the user is not logged in, redirect them to /login
     if not session_token:
-        return RedirectResponse(url="/login")
+        return RedirectResponse(url=f"{FRONTEND_BASE_URL}/login.html", status_code=302)
 
     state = session_token  # Use session token as state
     auth_url = (
