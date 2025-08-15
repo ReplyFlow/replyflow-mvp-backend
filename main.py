@@ -459,16 +459,19 @@ async def facebook_callback(request: Request, code: str, state: Optional[str] = 
 
             # Save access tokens per page
             for page in pages_data.get("data", []):
-                page_id = page.get("id")
-                page_access_token = page.get("access_token")
-                if page_id and page_access_token:
-                    token_store.save_token(
-                        user_id=current_user_id,
-                        provider="facebook",
-                        page_id=page_id,
-                        page_access_token=page_access_token,
-                        user_access_token=access_token
-                    )
+              logging.info(f"[CALLBACK] Saving page token for page {page_id} user {current_user_id}")
+              page_id = page.get("id")
+              page_access_token = page.get("access_token")
+              if page_id and page_access_token:
+                logging.info(f"[CALLBACK] current_user_id = {current_user_id}")
+                logging.info(f"[CALLBACK] pages = {pages_data.get('data', [])}")
+                token_store.save_token(
+                    user_id=current_user_id,
+                    provider="facebook",
+                    page_id=page_id,
+                    page_access_token=page_access_token,
+                    user_access_token=access_token
+                )
 
         return _redir(None)
 
@@ -1082,21 +1085,56 @@ async def _prepare_instagram_replies(
 
 
 @app.post("/instagram/prepare_replies")
-async def instagram_prepare_replies(current_user: dict = Depends(get_current_user)):
-    page_token = token_store.get_page_token(current_user["id"], "instagram")
-    if not page_token:
-        return {"status":"no_account", "message":"Please connect an Instagram Business or Creator account first.","replies":[]}
-    # …now call the Instagram Graph API…
+async def instagram_prepare_replies(
+    tone: str = "friendly",
+    max_posts: int = 3,
+    max_comments: int = 5,
+    current_user: dict = Depends(get_current_user),
+):
+    ig_token = token_store.get_token_for_user(current_user["id"], provider="instagram")
+    if not ig_token:
+        return {
+            "status": "no_account",
+            "message": "Please connect an Instagram Business or Creator account first.",
+            "replies": []
+        }
 
-    prepared = await _prepare_instagram_replies(tone, max_posts, max_comments, current_user)
+    ig_user_id = ig_token.get("ig_account_id")
+    page_access_token = ig_token.get("page_access_token")
+    if not ig_user_id or not page_access_token:
+        return {
+            "status": "no_account",
+            "message": "Missing Instagram access token. Please reconnect Instagram.",
+            "replies": []
+        }
+
+    try:
+        prepared = await _prepare_instagram_replies(
+            tone=tone,
+            max_posts=max_posts,
+            max_comments=max_comments,
+            current_user=current_user
+        )
+    except Exception as e:
+        logging.exception("Failed to prepare Instagram replies")
+        return {
+            "status": "error",
+            "message": "Something went wrong while preparing replies.",
+            "replies": []
+        }
+
     if not prepared:
         return {
             "status": "no_comments",
             "message": "No comments found.",
-            "replies": [],
+            "replies": []
         }
 
-    return {"status": "ok", "message": "Success", "replies": prepared}
+    return {
+        "status": "ok",
+        "message": "Replies prepared successfully.",
+        "replies": prepared
+    }
 
 
 @app.post("/instagram/post_replies")
@@ -1109,12 +1147,12 @@ async def instagram_post_replies(
     if not _httpx_available:
         raise HTTPException(status_code=500, detail="httpx is required for Instagram API interactions")
 
-    ig_token = token_store.get_token_for_user(current_user.get("id"), provider="instagram")
+    ig_token = token_store.get_token_for_user(current_user["id"], provider="instagram")
     if not ig_token:
         return {
             "status": "no_account",
             "message": "Please connect an Instagram Business or Creator account first.",
-            "replies_posted": {},
+            "replies_posted": {}
         }
 
     page_access_token = ig_token.get("page_access_token")
@@ -1122,36 +1160,55 @@ async def instagram_post_replies(
         return {
             "status": "no_account",
             "message": "Instagram token not found. Please reconnect Instagram.",
-            "replies_posted": {},
+            "replies_posted": {}
         }
 
-    prepared = await _prepare_instagram_replies(tone, max_posts, max_comments, current_user)
+    try:
+        prepared = await _prepare_instagram_replies(
+            tone=tone,
+            max_posts=max_posts,
+            max_comments=max_comments,
+            current_user=current_user
+        )
+    except Exception as e:
+        logging.exception("Failed to prepare Instagram replies for posting")
+        return {
+            "status": "error",
+            "message": "Something went wrong while preparing replies.",
+            "replies_posted": {}
+        }
+
     if not prepared:
         return {
             "status": "no_comments",
             "message": "No comments found to reply to.",
-            "replies_posted": {},
+            "replies_posted": {}
         }
 
     results: dict[str, int] = {}
+
     async with httpx.AsyncClient(timeout=15) as client:
         for item in prepared:
             comment_id = item["comment_id"]
             reply_message = item["reply"]
+            ig_user_id = item["ig_user_id"]
+
             try:
-                # Instagram replies are posted to the comment’s /replies edge
                 await client.post(
                     f"https://graph.facebook.com/v18.0/{comment_id}/replies",
                     params={"access_token": page_access_token},
                     json={"message": reply_message},
                 )
-                ig_user_id = item["ig_user_id"]
                 results[ig_user_id] = results.get(ig_user_id, 0) + 1
-            except Exception:
-                # Skip failures but continue with others
+            except Exception as e:
+                logging.warning(f"Failed to post IG reply to comment {comment_id}: {e}")
                 continue
 
-    return {"status": "ok", "message": "Replies posted successfully.", "replies_posted": results}
+    return {
+        "status": "ok",
+        "message": "Replies posted successfully.",
+        "replies_posted": results
+    }
 
 
 # X (formerly Twitter) endpoints
