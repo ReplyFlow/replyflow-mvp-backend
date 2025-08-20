@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-openai
-python-dotenv
-pydantic
-httpx
-requests
-openai>=1.0.0
