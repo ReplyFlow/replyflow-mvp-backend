@@ -1,2 +1,0 @@
-# Redirect the beta-signup route to the signup page
-/beta-signup  /replyflow_signup_page.html  200
