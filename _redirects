@@ -1,5 +1,0 @@
-# Redirect beta-signup to the signup page
-/beta-signup  /replyflow_signup_page.html  200
-
-# Redirect dashboard path to the dashboard HTML file
-/dashboard  /dashboard.html  200
