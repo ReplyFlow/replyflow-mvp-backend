@@ -1,0 +1,13 @@
+# Redirect beta-signup to the signup page
+/beta-signup  /replyflow_signup_page.html  200
+
+# Redirect dashboard path to the dashboard HTML file
+/dashboard  /dashboard.html  200
+
+# Redirect account/login paths to the account (login) HTML file. Without this redirect,
+# Netlify may treat these paths as missing even if the file exists. These
+# rules explicitly map the clean `/login` and `/account` paths and the `.html`
+# variants to the `account.html` file, ensuring that the login page is accessible.
+/login      /account.html  200
+/login.html /account.html  200
+/account    /account.html  200

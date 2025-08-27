@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReplyFlow – Log In or Sign Up</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Reuse the same colour palette as the main site for visual consistency */
+            --primary: #0A84FF;
+            --secondary: #32D2FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* Header styling similar to landing page */
+        .site-header {
+            width: 100%;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--primary);
+            color: #fff;
+        }
+        .site-header .brand a {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .auth-container {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 2rem;
+            margin: 1rem 0;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .auth-container h2 {
+            margin-top: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="email"],
+        input[type="password"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-family: inherit;
+            color: #fff;
+            background-color: var(--primary);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #0066CC;
+        }
+
+        .auth-message {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--accent);
+        }
+
+        /* Responsive adjustments */
+        @media (min-width: 768px) {
+            main {
+                flex-direction: row;
+                align-items: flex-start;
+                justify-content: center;
+                gap: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="brand">
+            <a href="index.html">ReplyFlow</a>
+        </div>
+    </header>
+    <main>
+        <!-- Sign Up form -->
+        <div class="auth-container">
+            <h2>Sign Up</h2>
+            <label for="signupEmail">Email</label>
+            <input type="email" id="signupEmail" placeholder="you@example.com" />
+            <label for="signupPassword">Password</label>
+            <input type="password" id="signupPassword" placeholder="Choose a password" />
+            <button id="signupBtn">Create Account</button>
+            <div id="signupMessage" class="auth-message"></div>
+        </div>
+        <!-- Login form -->
+        <div class="auth-container">
+            <h2>Log In</h2>
+            <label for="loginEmail">Email</label>
+            <input type="email" id="loginEmail" placeholder="you@example.com" />
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" placeholder="Your password" />
+            <button id="loginBtn">Log In</button>
+            <div id="loginMessage" class="auth-message"></div>
+        </div>
+    </main>
+    <script>
+        // Base URL for your backend API. Update if deploying to a different host.
+        const API_BASE_URL = 'https://replyflow-mvp-backend.onrender.com';
+
+        // Token helpers
+        function setToken(token) {
+            localStorage.setItem('replyflow_token', token);
+        }
+
+        // Handle sign up
+        document.getElementById('signupBtn').addEventListener('click', async () => {
+            const email = document.getElementById('signupEmail').value.trim();
+            const password = document.getElementById('signupPassword').value;
+            const msgEl = document.getElementById('signupMessage');
+            if (!email || !password) {
+                msgEl.textContent = 'Please enter a valid email and password.';
+                return;
+            }
+            msgEl.textContent = 'Signing up...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => null);
+                    throw new Error(err?.detail || 'Sign up failed');
+                }
+                msgEl.textContent = 'Sign up successful. Please log in.';
+                document.getElementById('signupEmail').value = '';
+                document.getElementById('signupPassword').value = '';
+            } catch (error) {
+                msgEl.textContent = `Error: ${error.message}`;
+            }
+        });
+
+        // Handle login
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const msgEl = document.getElementById('loginMessage');
+            if (!email || !password) {
+                msgEl.textContent = 'Please enter your email and password.';
+                return;
+            }
+            msgEl.textContent = 'Logging in...';
+            try {
+                const res = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password }),
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Login failed');
+                }
+                // Save token and redirect to dashboard
+                setToken(data.access_token);
+                msgEl.textContent = '';
+                window.location.href = 'dashboard.html';
+            } catch (error) {
+                msgEl.textContent = `Error: ${error.message}`;
+            }
+        });
+    </script>
+</body>
+</html>
