@@ -1,0 +1,8 @@
+{
+  "client_id": "https://replyflow-mvp-backend.onrender.com/static/bluesky-client-metadata.json",
+  "application_type": "web",
+  "grant_types": ["authorization_code", "refresh_token"],
+  "redirect_uris": ["https://replyflow-mvp-backend.onrender.com/bluesky/oauth/callback"],
+  "scope": "transition:generic",
+  "client_name": "ReplyFlow"
+}
