@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReplyFlow – Pre‑sale Signup</title>
+    <!-- Reuse Google Fonts from the main site for consistency -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0A84FF;
+            --secondary: #32D2FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* Header styling similar to the main site */
+        .site-header {
+            width: 100%;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--primary);
+            color: #fff;
+        }
+        .site-header .brand a {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
+        }
+
+        .signup-container {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 2rem;
+            width: 100%;
+            max-width: 480px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .signup-container h1 {
+            margin-top: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.8rem;
+            color: var(--primary);
+        }
+
+        .signup-container p {
+            font-size: 1rem;
+            color: var(--text-medium);
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="email"] {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            font-family: inherit;
+            font-size: 1rem;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            font-size: 1rem;
+            font-family: inherit;
+            color: #fff;
+            background-color: var(--accent);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #e05f00;
+        }
+
+        .small-text {
+            font-size: 0.875rem;
+            color: var(--text-medium);
+            margin-top: 1rem;
+        }
+        .small-text a { color: var(--primary); text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="brand">
+            <a href="index.html">ReplyFlow</a>
+        </div>
+    </header>
+    <main>
+        <div class="signup-container">
+            <h1>Join the Early Adopter Waitlist</h1>
+            <p>Become a founding member and help us validate traction. Pay just <strong>$99 for 6 months</strong> and lock in a lifetime 50% discount forever. Limited to the first 50 adopters.</p>
+            <form method="POST" action="https://formspree.io/f/xgyzvnljo">
+                <!-- Redirect to a thank-you page after successful submission -->
+                <input type="hidden" name="_redirect" value="https://replyflowapp.com/success.html">
+                <!-- Hidden field so the team knows this submission came from the pre‑sale page -->
+                <input type="hidden" name="signup_type" value="pre_sale">
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" placeholder="Your name" required>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" required>
+                <button type="submit">Join Waitlist</button>
+            </form>
+            <p class="small-text">By signing up, you agree to our <a href="privacy.html">Privacy Policy</a>.</p>
+        </div>
+    </main>
+</body>
+</html>
