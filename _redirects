@@ -1,0 +1,51 @@
+# Redirect beta-signup to the signup page
+/beta-signup  /replyflow_signup_page.html  200
+
+# Redirect dashboard path to the dashboard HTML file
+/dashboard  /dashboard.html  200
+
+# Redirect account/login paths to the account (login) HTML file. Without this redirect,
+# Netlify may treat these paths as missing even if the file exists. These
+# rules explicitly map the clean `/login` and `/account` paths and the `.html`
+# variants to the `account.html` file, ensuring that the login page is accessible.
+/login      /account.html  200
+/login.html /account.html  200
+/account    /account.html  200
+
+# Redirect pre‑sale signup shortcuts to the dedicated sign‑up page. These
+# rules ensure Netlify serves the presale form when a user navigates to
+# `/pre-sale-signup` or `/presale_signup` without needing to append `.html`.
+/pre-sale-signup   /presale_signup.html  200
+/presale_signup    /presale_signup.html  200
+
+# Redirect demo path to the interactive demo page. This ensures
+# that navigating to `/demo` without the `.html` suffix will
+# correctly serve the demo page.
+/demo    /demo.html  200
+
+# Redirect account settings and manage subscription clean paths to their HTML files
+/account_settings        /account_settings.html        200
+/manage-subscription     /manage_subscription.html     200
+/manage_subscription     /manage_subscription.html     200
+
+# Redirect terms paths to the Terms of Service page.  These rules allow
+# navigation to `/terms` or `/terms-of-service` to serve the `terms.html`
+# file without requiring the `.html` extension.
+/terms               /terms.html              200
+/terms-of-service    /terms.html              200
+
+# Redirect privacy paths to the Privacy Policy page. These rules map the clean
+# `/privacy` and `/privacy-policy` paths to the `privacy.html` page, ensuring
+# that users can access the policy without specifying the `.html` extension.
+/privacy            /privacy.html            200
+/privacy-policy     /privacy.html            200
+
+# Redirect about paths to the About page. These rules ensure that navigating
+# to `/about` or `/about.html` serves the `about.html` file.
+/about             /about.html             200
+/about.html        /about.html             200
+
+# Redirect contact paths to the Contact page. These rules allow users to
+# access `/contact` without needing the `.html` extension.
+/contact           /contact.html           200
+/contact.html      /contact.html           200
