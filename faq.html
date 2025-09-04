@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ – ReplyFlow</title>
+    <!-- Favicon for consistent branding on all pages -->
+    <link rel="shortcut icon" href="/favicon.png" type="image/png">
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0A84FF;
+            --secondary: #32D2FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        /* Header styling reused from contact page */
+        .site-header {
+            width: 100%;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: var(--primary);
+            color: #fff;
+        }
+        .site-header .brand a {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fff;
+        }
+        /* Container for the FAQ content */
+        main {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem 1rem;
+        }
+        .faq-container {
+            background: #fff;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 2rem;
+            max-width: 800px;
+            width: 100%;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .faq-container h1 {
+            margin-top: 0;
+            font-family: 'Poppins', sans-serif;
+            font-size: 2rem;
+            color: var(--primary);
+            text-align: center;
+        }
+        .faq-item {
+            margin-bottom: 1.5rem;
+        }
+        .faq-item h2 {
+            font-size: 1.2rem;
+            margin: 0 0 0.5rem;
+            color: var(--primary);
+        }
+        .faq-item p {
+            margin: 0;
+            color: var(--text-medium);
+            line-height: 1.5;
+        }
+        /* Footer styling */
+        footer {
+            text-align: center;
+            padding: 1rem 0;
+            background-color: #fff;
+            border-top: 1px solid #e2e8f0;
+        }
+        footer p {
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <header class="site-header">
+        <div class="brand">
+            <a href="index.html">ReplyFlow</a>
+        </div>
+    </header>
+    <main>
+        <div class="faq-container">
+            <h1>Frequently Asked Questions</h1>
+            <!-- FAQ Items -->
+            <div class="faq-item">
+                <h2>What is ReplyFlow?</h2>
+                <p>ReplyFlow is an AI‑powered tool that helps you manage and reply to comments across multiple social media platforms. It provides on‑brand responses, saving you time and helping you engage with your audience effectively.</p>
+            </div>
+            <div class="faq-item">
+                <h2>How do I sign up?</h2>
+                <p>You can sign up by clicking the <strong>Log In</strong> button on the home page and creating an account. Once you’ve created your account, you can start connecting your social platforms and generating replies right away.</p>
+            </div>
+            <div class="faq-item">
+                <h2>Which social platforms are supported?</h2>
+                <p>ReplyFlow currently supports Instagram, X (formerly Twitter), Reddit, Facebook, LinkedIn, Bluesky, YouTube, Google Business Profile, Telegram and Pinterest. We’re continually working to add more platforms and extend our integrations.</p>
+            </div>
+            <div class="faq-item">
+                <h2>How does the pricing work?</h2>
+                <p>We offer a free plan that allows a limited number of replies per day, as well as paid plans with higher limits and more advanced features. Visit our pricing page for details on the Free, Solo and Pro plans.</p>
+            </div>
+            <div class="faq-item">
+                <h2>Is my data secure?</h2>
+                <p>We take security seriously. Your credentials and data are stored securely, and we use encryption and best practices to protect your information. We also comply with all relevant data protection regulations.</p>
+            </div>
+            <div class="faq-item">
+                <h2>How do I connect my social accounts?</h2>
+                <p>Once you’ve signed in, navigate to your dashboard where you’ll find options to connect each platform. For some platforms, like Reddit and LinkedIn, you’ll be redirected to authorize access. Others may require you to paste a token. Follow the on‑screen instructions for each platform.</p>
+            </div>
+            <div class="faq-item">
+                <h2>How do I get help?</h2>
+                <p>If you need assistance, you can use our Discord support server or the Intercom live chat from your dashboard. You can also email us directly at <a href="mailto:support@replyflowapp.com">support@replyflowapp.com</a>.</p>
+            </div>
+        </div>
+    </main>
+    <footer>
+        <p>&copy; 2025 ReplyFlow. All rights reserved.</p>
+    </footer>
+</body>
+</html>
