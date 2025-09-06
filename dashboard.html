@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReplyFlow Dashboard – Upload to YouTube</title>
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="/favicon.png" type="image/png">
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <!-- PWA manifest and theme color -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0A84FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+        :root {
+            --primary: #0A84FF;
+            --secondary: #32D2FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: var(--bg);
+            line-height: 1.4;
+        }
+
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        /* Simple navigation bar */
+        nav {
+            background-color: #ffffff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav .nav-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        nav .nav-links a {
+            margin-left: 1rem;
+            font-weight: 500;
+        }
+
+        /* Video Upload Section styles */
+        .video-upload {
+            background-color: #ffffff;
+            padding: 4rem 1rem;
+            margin: 2rem auto;
+            max-width: 1100px;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        /* Beta notification banner styles */
+        .beta-banner {
+            background-color: #FFF7E5;
+            color: var(--text-dark);
+            padding: 1rem;
+            margin: 1rem auto;
+            max-width: 1100px;
+            border: 1px solid #FFD9B3;
+            border-radius: 0.5rem;
+            text-align: center;
+            font-size: 0.9rem;
+        }
+
+        /* Small beta badge next to the brand */
+        .beta-badge {
+            background-color: var(--accent);
+            color: #ffffff;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.5rem;
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+        .video-upload h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        .video-upload p {
+            font-size: 1rem;
+            color: var(--text-medium);
+            margin-bottom: 1.5rem;
+        }
+        .video-upload form {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .video-upload label {
+            font-weight: 500;
+            color: var(--text-dark);
+            display: flex;
+            flex-direction: column;
+        }
+        .video-upload input[type="text"],
+        .video-upload textarea,
+        .video-upload select {
+            width: 100%;
+            padding: 0.5rem;
+            border-radius: 0.5rem;
+            border: 1px solid #E2E8F0;
+            font-size: 1rem;
+            resize: vertical;
+        }
+        .video-upload button {
+            align-self: flex-start;
+            background-color: var(--primary);
+            color: #fff;
+            padding: 0.75rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .video-upload button:hover {
+            background-color: #0369A1;
+        }
+        #uploadResult {
+            margin-top: 1rem;
+            font-weight: 500;
+        }
+
+        /* Changelog section styles */
+        .changelog {
+            background-color: #ffffff;
+            padding: 2rem 1rem;
+            margin: 2rem auto;
+            max-width: 1100px;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+        .changelog h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+        .changelog ul {
+            list-style: none;
+            padding: 0;
+        }
+        .changelog li {
+            margin-bottom: 0.75rem;
+            padding-left: 1.25rem;
+            position: relative;
+        }
+        .changelog li::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: var(--primary);
+            border-radius: 50%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-title">ReplyFlow<span id="betaBadge" class="beta-badge" style="display: none;">Beta</span></div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <!-- Additional links could go here -->
+        </div>
+    </nav>
+
+    <!-- Beta notification banner; hidden by default and shown only in beta environments -->
+    <section id="betaBanner" class="beta-banner" style="display: none;">
+        <strong>Beta Preview:</strong>
+        You are using an early preview version of ReplyFlow. We would love your feedback!
+        Please join our <a href="https://discord.gg/jFKMfu4b" target="_blank">Discord</a> or use the chat widget to leave your comments.
+    </section>
+
+    <!-- Main content -->
+    <main>
+        <section id="videoUploadSection" class="video-upload">
+            <h2>Upload your video to YouTube</h2>
+            <p>Post your videos directly to YouTube using our integrated uploader. You must be logged in and connected to your YouTube account.</p>
+            <form id="youtubeUploadForm">
+                <label>
+                    Title:
+                    <input type="text" name="title" required />
+                </label>
+                <label>
+                    Description:
+                    <textarea name="description" rows="3" required></textarea>
+                </label>
+                <label>
+                    Privacy status:
+                    <select name="privacy_status">
+                        <option value="public">Public</option>
+                        <option value="unlisted">Unlisted</option>
+                        <option value="private">Private</option>
+                    </select>
+                </label>
+                <label>
+                    Video file:
+                    <input type="file" name="file" accept="video/*" required />
+                </label>
+                <button type="submit">Upload Video</button>
+            </form>
+            <div id="uploadResult"></div>
+        </section>
+
+        <!-- Changelog section for beta users; hidden by default -->
+        <section id="changelogSection" class="changelog" style="display: none;">
+            <h3>Changelog & Updates</h3>
+            <ul>
+                <li><strong>Sept 5, 2025:</strong> Beta launch – Added YouTube integration, beta sign‑up flow, and support channels.</li>
+                <li><strong>Sept 6, 2025:</strong> Added beta notification banner, badge, and this changelog section.</li>
+                <li>More updates coming soon – stay tuned and provide feedback via Discord or Intercom!</li>
+            </ul>
+            <p style="margin-top: 1rem; font-size: 0.9rem; color: var(--text-medium);">We plan to post updates on a regular cadence, so check back often to see what's new.</p>
+        </section>
+    </main>
+
+    <!-- Register the service worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/static/service-worker.js').catch(function(err) {
+            console.error('Service worker registration failed:', err);
+          });
+        });
+      }
+    </script>
+
+    <!-- Video upload form submission script -->
+    <script>
+      const uploadForm = document.getElementById('youtubeUploadForm');
+      if (uploadForm) {
+        uploadForm.addEventListener('submit', async function(event) {
+          event.preventDefault();
+          const form = event.target;
+          const resultDiv = document.getElementById('uploadResult');
+          resultDiv.textContent = 'Uploading...';
+          // Extract form values
+          const title = form.querySelector('input[name="title"]').value;
+          const description = form.querySelector('textarea[name="description"]').value;
+          const privacy = form.querySelector('select[name="privacy_status"]').value;
+          const fileInput = form.querySelector('input[name="file"]');
+          const file = fileInput && fileInput.files ? fileInput.files[0] : null;
+          if (!file) {
+            resultDiv.textContent = 'Please select a video file.';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onloadend = async function() {
+            const dataUrl = reader.result;
+            const base64Data = dataUrl.split(',')[1];
+            const payload = {
+              title: title,
+              description: description,
+              privacy_status: privacy,
+              file_name: file.name,
+              file_content: base64Data
+            };
+            try {
+              const response = await fetch('/youtube/upload_video', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+              });
+              const data = await response.json();
+              if (data && data.status === 'success') {
+                resultDiv.textContent = 'Video uploaded successfully. Video ID: ' + data.video_id;
+              } else {
+                resultDiv.textContent = (data && data.message) ? data.message : 'Upload failed.';
+              }
+            } catch (err) {
+              resultDiv.textContent = 'Error uploading video: ' + err;
+            }
+          };
+          reader.readAsDataURL(file);
+        });
+      }
+    </script>
+
+    <!-- Hide video upload section when the feature is disabled -->
+    <script>
+      // Fetch feature flags from the backend and hide the upload section if disabled.
+      (function() {
+        try {
+          fetch('/feature-flags')
+            .then(function(resp) { return resp.json(); })
+            .then(function(flags) {
+              // If video uploads are disabled, hide the upload section
+              if (flags && flags.video_upload === false) {
+                var vidSection = document.getElementById('videoUploadSection');
+                if (vidSection) {
+                  vidSection.style.display = 'none';
+                }
+              }
+              // If video uploads are enabled (beta mode), show beta banner and badge
+              if (flags && flags.video_upload === true) {
+                var betaBanner = document.getElementById('betaBanner');
+                if (betaBanner) {
+                  betaBanner.style.display = 'block';
+                }
+                var betaBadge = document.getElementById('betaBadge');
+                if (betaBadge) {
+                  betaBadge.style.display = 'inline-block';
+                }
+                var changelogSection = document.getElementById('changelogSection');
+                if (changelogSection) {
+                  changelogSection.style.display = 'block';
+                }
+              }
+            })
+            .catch(function(err) {
+              /* Ignore fetch errors; default to showing the section */
+            });
+        } catch (e) {
+          /* Ignore unexpected errors */
+        }
+      })();
+    </script>
+</body>
+</html>
