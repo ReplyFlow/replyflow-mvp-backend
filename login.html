@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In – ReplyFlow</title>
+    <!-- Use the same fonts as the main site for a consistent look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #0A84FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: var(--bg);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+        .login-container {
+            background-color: #ffffff;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            max-width: 400px;
+            width: 100%;
+        }
+        .login-container h1 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.75rem;
+            margin-bottom: 1.5rem;
+            color: var(--primary);
+        }
+        .login-container label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-dark);
+        }
+        .login-container input {
+            width: 100%;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            border: 1px solid #E2E8F0;
+            border-radius: 0.5rem;
+            font-size: 1rem;
+        }
+        .login-container button {
+            width: 100%;
+            padding: 0.75rem;
+            background-color: var(--primary);
+            color: #ffffff;
+            border: none;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .login-container button:hover {
+            background-color: #0369A1;
+        }
+        .login-container p {
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-medium);
+        }
+        .error-message {
+            color: #E53E3E;
+            font-size: 0.9rem;
+            margin-top: -0.5rem;
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <a href="/">ReplyFlow</a>
+        <a href="/signup.html">Sign Up</a>
+    </header>
+    <main>
+        <div class="login-container">
+            <h1>Log In</h1>
+            <form id="loginForm">
+                <label for="loginEmail">Email</label>
+                <input type="email" id="loginEmail" required autocomplete="username">
+                <label for="loginPassword">Password</label>
+                <input type="password" id="loginPassword" required autocomplete="current-password">
+                <div id="loginError" class="error-message" style="display:none;"></div>
+                <button type="submit">Log In</button>
+            </form>
+            <p>Don't have an account? <a href="/signup.html">Sign Up</a></p>
+        </div>
+    </main>
+    <script>
+        // Handle login form submission
+        const loginForm = document.getElementById('loginForm');
+        /**
+         * Determine the API base URL.  See signup.html for explanation.  When
+         * deploying your API on a separate domain, update this constant to
+         * point at that domain.  If you proxy API calls through your
+         * frontend domain, leave API_BASE_URL as an empty string.
+         */
+        const API_BASE_URL = 'https://replyflow-mvp-backend.onrender.com';
+        loginForm.addEventListener('submit', async function (event) {
+            event.preventDefault();
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            errorDiv.style.display = 'none';
+            try {
+                const resp = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, password: password })
+                });
+                const data = await resp.json();
+                if (resp.ok && data && data.access_token) {
+                    // Persist token in localStorage for subsequent requests
+                    localStorage.setItem('replyflowToken', data.access_token);
+                    // Redirect to the dashboard
+                    window.location.href = '/dashboard.html';
+                } else {
+                    // Show error message returned from the server
+                    errorDiv.textContent = (data && data.detail) || 'Login failed';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.textContent = 'An unexpected error occurred';
+                errorDiv.style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
