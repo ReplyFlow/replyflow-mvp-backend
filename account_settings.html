@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Settings – ReplyFlow</title>
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="/favicon.png" type="image/png">
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    <!-- PWA manifest and theme color -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#0A84FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <style>
+        :root {
+            --primary: #0A84FF;
+            --accent: #FF6B00;
+            --bg: #F7FAFC;
+            --text-dark: #2D3748;
+            --text-medium: #4A5568;
+        }
+        * {
+            box-sizing: border-box;
+        }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            color: var(--text-dark);
+            background-color: var(--bg);
+            line-height: 1.4;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+        nav {
+            background-color: #ffffff;
+            border-bottom: 1px solid #E2E8F0;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        nav .nav-title {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        nav .nav-links a {
+            margin-left: 1rem;
+            font-weight: 500;
+        }
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 2rem 1rem;
+            max-width: 900px;
+            width: 100%;
+            margin: 0 auto;
+        }
+        .settings-section {
+            background-color: #ffffff;
+            padding: 2rem 1rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            width: 100%;
+        }
+        .settings-section h2 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+        .account-delete-section h3 {
+            font-family: 'Poppins', sans-serif;
+            font-size: 1.5rem;
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--primary);
+        }
+        .account-delete-section p {
+            font-size: 1rem;
+            color: var(--text-medium);
+            margin-bottom: 1rem;
+        }
+        .account-delete-section button {
+            background-color: #E53E3E;
+            color: #ffffff;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 9999px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background-color 0.2s ease;
+        }
+        .account-delete-section button:hover {
+            background-color: #C53030;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="nav-title">ReplyFlow</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/dashboard.html">Dashboard</a>
+            <a href="/account_settings.html">Account Settings</a>
+            <a id="logoutLink" href="javascript:void(0);">Logout</a>
+        </div>
+    </nav>
+    <main>
+        <div class="settings-section">
+            <h2>Account Settings</h2>
+            <p style="font-size:1rem;color:var(--text-medium);">Manage your account preferences below.</p>
+
+            <!-- Account Information -->
+            <div class="account-info-section" style="margin-bottom: 2rem;">
+                <h3>Account Information</h3>
+                <p id="accountInfo">Loading account details...</p>
+            </div>
+
+            <!-- Subscription management -->
+            <div class="subscription-section" style="margin-bottom: 2rem;">
+                <h3>Plan Management</h3>
+                <p style="font-size:1rem;color:var(--text-medium);">Upgrade, downgrade, or cancel your current plan.</p>
+                <div style="display:flex;gap:1rem;flex-wrap:wrap;">
+                    <!-- Change plan: takes user to Stripe portal for upgrading or downgrading -->
+                    <button id="changePlanBtn" type="button" style="background-color: var(--primary);color:#fff;padding:0.75rem 1.5rem;border:none;border-radius:9999px;cursor:pointer;font-weight:500;">
+                        Change Plan
+                    </button>
+                    <!-- Cancel: downgrade to free tier -->
+                    <button id="cancelSubscriptionBtn" type="button" style="background-color:#E53E3E;color:#fff;padding:0.75rem 1.5rem;border:none;border-radius:9999px;cursor:pointer;font-weight:500;">
+                        Cancel Plan
+                    </button>
+                </div>
+                <div id="subscriptionMessage" style="margin-top: 1rem;font-size:0.9rem;"></div>
+            </div>
+
+            <!-- Delete Account -->
+            <div class="account-delete-section">
+                <h3>Delete your account</h3>
+                <p>If you no longer wish to use ReplyFlow, you can permanently delete your account. This action cannot be undone.</p>
+                <button id="deleteAccountBtn" type="button">Delete Account</button>
+                <div id="deleteAccountResult" style="margin-top: 1rem; font-size: 0.9rem;"></div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Register service worker for PWA support -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/static/service-worker.js').catch(function(err) {
+            console.error('Service worker registration failed:', err);
+          });
+        });
+      }
+    </script>
+
+    <!-- Account deletion and logout script -->
+    <script>
+      (function() {
+        // API base URL; update if your backend is on a different domain
+        const API_BASE_URL = 'https://replyflow-mvp-backend.onrender.com';
+
+        // Helper to get auth token from storage
+        function getAuthToken() {
+          return localStorage.getItem('replyflowToken');
+        }
+
+        // Logout handler
+        const logoutLink = document.getElementById('logoutLink');
+        if (logoutLink) {
+          logoutLink.addEventListener('click', function(event) {
+            event.preventDefault();
+            localStorage.removeItem('replyflowToken');
+            window.location.href = '/login.html';
+          });
+        }
+
+        // Delete account handler
+        const deleteBtn = document.getElementById('deleteAccountBtn');
+        if (deleteBtn) {
+          deleteBtn.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) {
+              return;
+            }
+            const resultDiv = document.getElementById('deleteAccountResult');
+            resultDiv.textContent = '';
+            const token = getAuthToken();
+            if (!token) {
+              resultDiv.textContent = 'You are not logged in.';
+              return;
+            }
+            try {
+              const response = await fetch(`${API_BASE_URL}/account/delete`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token
+                }
+              });
+              const data = await response.json();
+              if (response.ok && data && data.status === 'success') {
+                // Remove token and redirect
+                localStorage.removeItem('replyflowToken');
+                resultDiv.textContent = 'Your account has been deleted. Redirecting...';
+                setTimeout(function() {
+                  window.location.href = '/';
+                }, 2000);
+              } else {
+                resultDiv.textContent = (data && data.detail) ? data.detail : 'Account deletion failed.';
+              }
+            } catch (err) {
+              resultDiv.textContent = 'Error deleting account: ' + err;
+            }
+          });
+        }
+
+        // Fetch and display account info on page load
+        async function loadAccountInfo() {
+          const infoElem = document.getElementById('accountInfo');
+          if (!infoElem) return;
+          const token = getAuthToken();
+          if (!token) {
+            infoElem.textContent = 'You are not logged in.';
+            return;
+          }
+          try {
+            const resp = await fetch(`${API_BASE_URL}/me`, {
+              headers: {
+                'Authorization': 'Bearer ' + token
+              }
+            });
+            const data = await resp.json();
+            if (resp.ok && data) {
+              const { email, plan } = data;
+              infoElem.innerHTML = `<strong>Email:</strong> ${email}<br><strong>Plan:</strong> ${plan}`;
+            } else {
+              infoElem.textContent = (data && data.detail) ? data.detail : 'Failed to load account info.';
+            }
+          } catch (err) {
+            infoElem.textContent = 'Error loading account info: ' + err;
+          }
+        }
+        // Call on load
+        loadAccountInfo();
+
+        // Change plan handler – redirects user to Stripe billing portal to upgrade or downgrade
+        const changeBtn = document.getElementById('changePlanBtn');
+        if (changeBtn) {
+          changeBtn.addEventListener('click', async function() {
+            const msgElem = document.getElementById('subscriptionMessage');
+            msgElem.textContent = '';
+            const token = getAuthToken();
+            if (!token) {
+              msgElem.textContent = 'You must be logged in to manage your subscription.';
+              return;
+            }
+            try {
+              const resp = await fetch(`${API_BASE_URL}/subscription/portal`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token
+                }
+              });
+              const data = await resp.json();
+              if (resp.ok && data && data.url) {
+                // Redirect to Stripe billing portal
+                window.location.href = data.url;
+              } else {
+                msgElem.textContent = (data && data.detail) ? data.detail : 'Failed to create portal session.';
+              }
+            } catch (err) {
+              msgElem.textContent = 'Error opening portal: ' + err;
+            }
+          });
+        }
+
+        // Cancel Subscription handler
+        const cancelBtn = document.getElementById('cancelSubscriptionBtn');
+        if (cancelBtn) {
+          cancelBtn.addEventListener('click', async function() {
+            if (!confirm('Are you sure you want to cancel your subscription?')) {
+              return;
+            }
+            const msgElem = document.getElementById('subscriptionMessage');
+            msgElem.textContent = '';
+            const token = getAuthToken();
+            if (!token) {
+              msgElem.textContent = 'You must be logged in to cancel your subscription.';
+              return;
+            }
+            try {
+              const resp = await fetch(`${API_BASE_URL}/subscription/cancel`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': 'Bearer ' + token
+                }
+              });
+              const data = await resp.json();
+              if (resp.ok && data && data.status === 'canceled') {
+                msgElem.textContent = 'Your subscription has been canceled. You have been downgraded to the free plan.';
+                // Refresh account info to show updated plan
+                loadAccountInfo();
+              } else {
+                msgElem.textContent = (data && data.detail) ? data.detail : 'Failed to cancel subscription.';
+              }
+            } catch (err) {
+              msgElem.textContent = 'Error canceling subscription: ' + err;
+            }
+          });
+        }
+      })();
+    </script>
+</body>
+</html>
